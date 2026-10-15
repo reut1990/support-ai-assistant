@@ -30,6 +30,17 @@ evaluation/         accuracy tests and results
 docs/screenshots/   images for this README
 ```
 
+## Run it
+
+```bash
+pip install -r requirements.txt
+cp .env.example .env
+python -m scripts.check_connection   # reads the sample data in this repository
+python -m pytest                     # runs the tests
+```
+
+To read tickets and articles from Google Drive instead, follow [docs/setup-google-drive.md](docs/setup-google-drive.md).
+
 ## Data and credits
 
 All tickets, customers and companies are fictional. Help-article topics are inspired by common questions in the public [Shopify Help Center](https://help.shopify.com), but every article is written from scratch for this project.

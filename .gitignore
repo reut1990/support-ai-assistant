@@ -14,3 +14,7 @@ venv/
 .vscode/
 .idea/
 .DS_Store
+
+# Google key file and generated output
+credentials/
+data/output/
