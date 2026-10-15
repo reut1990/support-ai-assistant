@@ -1,0 +1,16 @@
+# Secrets: API keys and credentials never go in the repository
+.env
+*.key
+credentials*.json
+service-account*.json
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Editors and OS files
+.vscode/
+.idea/
+.DS_Store
