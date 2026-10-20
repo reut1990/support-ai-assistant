@@ -18,7 +18,9 @@ Claude Haiku 5.5 triaged all 100 labeled tickets for about **$0.02** in total.
 | Churn risk | 75% | **80%** (100% within one level) |
 | Escalations caught | 9 of 12, 12 false alarms | **9 of 12, 2 false alarms** |
 
-Every miss on urgency, sentiment and churn risk is one level off, and most are borderline cases such as how-to questions labeled medium urgency. Full details, including every mistake and the AI's reasoning: [evaluation/report.md](evaluation/report.md).
+Every miss on urgency, sentiment and churn risk is one level off, and most are borderline cases such as how-to questions labeled medium urgency. Full details, including every mistake and the AI's reasoning: [evaluation/report_v1.md](evaluation/report_v1.md).
+
+The instructions are being improved based on these mistakes (version 2 in `src/triage/prompt.py`).
 
 ## Planned features
 

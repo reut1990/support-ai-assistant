@@ -10,6 +10,7 @@ from collections import Counter
 from pathlib import Path
 
 from src.connectors import get_data_source
+from src.triage.prompt import PROMPT_VERSION
 from src.triage.routing import ESCALATIONS, route
 
 FIELDS = ["category", "urgency", "sentiment", "churn_risk"]
@@ -61,7 +62,7 @@ def pct(a: int, b: int) -> str:
 
 def build_report(stats: dict) -> str:
     n = stats["n"]
-    lines = ["# Triage accuracy report", "",
+    lines = [f"# Triage accuracy report: version {PROMPT_VERSION.removeprefix('v')} instructions", "",
              f"The AI's answers for **{n} tickets** compared with labels written by a person.", "",
              "| Field | Exactly right | Right or one level off |", "| --- | --- | --- |"]
     for f, s in stats["fields"].items():

@@ -1,4 +1,4 @@
-# Triage accuracy report
+# Triage accuracy report: version 1 instructions
 
 The AI's answers for **100 tickets** compared with labels written by a person.
 
