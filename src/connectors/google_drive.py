@@ -9,7 +9,7 @@ import time
 
 from src import config
 from src.connectors.base import DataSource
-from src.models import AI_COLUMNS, Article, Ticket, parse_article
+from src.models import Article, Ticket, parse_article
 
 SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets",
@@ -48,31 +48,34 @@ class GoogleDriveSource(DataSource):
     def list_tickets(self) -> list[Ticket]:
         return [Ticket.from_row(row) for row in self._worksheet().get_all_records()]
 
-    def list_triage(self) -> dict[str, dict]:
+    def list_results(self, columns: list[str]) -> dict[str, dict]:
         results = {}
         for row in self._worksheet().get_all_records():
-            values = {c: str(row.get(c, "")) for c in AI_COLUMNS}
-            if values["ai_category"]:
+            values = {c: str(row.get(c, "")) for c in columns}
+            if values[columns[0]]:
                 results[str(row["ticket_id"])] = values
         return results
 
-    def write_triage(self, ticket_id: str, result: dict) -> None:
+    def write_results(self, ticket_id: str, values: dict) -> None:
         ws = self._worksheet()
         if self._header is None:
-            header = _with_retry(lambda: ws.row_values(1))
-            missing = [c for c in AI_COLUMNS if c not in header]
-            if missing:
-                header = header + missing
-                _with_retry(lambda: ws.update([header], "A1"))
-            self._header = header
+            self._header = _with_retry(lambda: ws.row_values(1))
             ids = _with_retry(lambda: ws.col_values(1))
             self._rows = {str(v): i for i, v in enumerate(ids, start=1)}
+        missing = [c for c in values if c not in self._header]
+        if missing:
+            self._header = self._header + missing
+            _with_retry(lambda: ws.update([self._header], "A1"))
         row = self._rows.get(ticket_id)
         if row is None:
             raise KeyError(f"Ticket {ticket_id} not found in the sheet.")
-        first = self._header.index(AI_COLUMNS[0]) + 1
-        values = [[result.get(c, "") for c in AI_COLUMNS]]
-        _with_retry(lambda: ws.update(values, f"{_col_letter(first)}{row}"))
+        # The columns of one result sit side by side, so they're saved with a single write.
+        positions = sorted(self._header.index(c) for c in values)
+        first, last = positions[0], positions[-1]
+        cells = [str(values.get(c, "")) if c in values else None for c in self._header[first:last + 1]]
+        if None in cells:
+            raise ValueError("Result columns must sit next to each other in the sheet.")
+        _with_retry(lambda: ws.update([cells], f"{_col_letter(first + 1)}{row}"))
 
     # --- articles (Google Drive folder) -----------------------------------
     def list_articles(self) -> list[Article]:

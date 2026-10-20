@@ -5,7 +5,7 @@ from pathlib import Path
 
 from src import config
 from src.connectors.base import DataSource
-from src.models import AI_COLUMNS, Article, Ticket, parse_article
+from src.models import AI_COLUMNS, REPLY_COLUMNS, Article, Ticket, parse_article
 
 
 class LocalFilesSource(DataSource):
@@ -27,20 +27,23 @@ class LocalFilesSource(DataSource):
         articles = [parse_article(p.read_text(encoding="utf-8"), p.name) for p in paths]
         return sorted(articles, key=lambda a: a.article_id)
 
-    def list_triage(self) -> dict[str, dict]:
+    def _read_results(self) -> dict[str, dict]:
         if not self.results_csv.exists():
             return {}
         with self.results_csv.open(encoding="utf-8") as f:
-            return {r["ticket_id"]: {c: r.get(c, "") for c in AI_COLUMNS} for r in csv.DictReader(f)}
+            return {r["ticket_id"]: r for r in csv.DictReader(f)}
 
-    def write_triage(self, ticket_id: str, result: dict) -> None:
-        rows = {}
-        if self.results_csv.exists():
-            with self.results_csv.open(encoding="utf-8") as f:
-                rows = {r["ticket_id"]: r for r in csv.DictReader(f)}
-        rows[ticket_id] = {"ticket_id": ticket_id, **{c: result.get(c, "") for c in AI_COLUMNS}}
+    def list_results(self, columns: list[str]) -> dict[str, dict]:
+        rows = self._read_results()
+        return {tid: {c: r.get(c) or "" for c in columns} for tid, r in rows.items() if r.get(columns[0])}
+
+    def write_results(self, ticket_id: str, values: dict) -> None:
+        rows = self._read_results()
+        rows.setdefault(ticket_id, {"ticket_id": ticket_id}).update({k: str(v) for k, v in values.items()})
+        fields = ["ticket_id", *AI_COLUMNS, *REPLY_COLUMNS]
+        fields += [k for r in rows.values() for k in r if k not in fields]
         self.results_csv.parent.mkdir(parents=True, exist_ok=True)
         with self.results_csv.open("w", newline="", encoding="utf-8") as f:
-            writer = csv.DictWriter(f, fieldnames=["ticket_id", *AI_COLUMNS])
+            writer = csv.DictWriter(f, fieldnames=list(dict.fromkeys(fields)), restval="")
             writer.writeheader()
             writer.writerows(rows.values())

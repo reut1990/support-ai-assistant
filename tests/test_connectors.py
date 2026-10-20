@@ -179,3 +179,15 @@ def test_google_write_reads_sheet_once_and_retries_rate_limit(monkeypatch):
     header = ws.rows[0]
     assert dict(zip(header, ws.rows[1]))["ai_category"] == "payments"
     assert dict(zip(header, ws.rows[2]))["ai_category"] == "domains"
+
+
+def test_google_adds_reply_columns_after_triage_columns():
+    source, ws = make_google_source()
+    source.write_triage("T-1", {"ai_category": "payments"})
+    source.write_reply("T-1", {"ai_answered": "yes", "ai_reply": "Hi", "ai_sources": "KB-201 Payouts"})
+    header = ws.rows[0]
+    assert header[-4:] == ["ai_answered", "ai_reply", "ai_sources", "ai_missing"]
+    row = dict(zip(header, ws.rows[1]))
+    assert row["ai_category"] == "payments" and row["ai_reply"] == "Hi"
+    assert source.list_replies() == {"T-1": {"ai_answered": "yes", "ai_reply": "Hi",
+                                             "ai_sources": "KB-201 Payouts", "ai_missing": ""}}

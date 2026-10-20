@@ -4,6 +4,8 @@ from dataclasses import dataclass, field
 
 # Columns the AI writes back for each ticket.
 AI_COLUMNS = ["ai_category", "ai_urgency", "ai_sentiment", "ai_churn_risk", "ai_queue", "ai_reason"]
+# Columns the AI writes when it drafts a reply from the help articles.
+REPLY_COLUMNS = ["ai_answered", "ai_reply", "ai_sources", "ai_missing"]
 
 
 @dataclass

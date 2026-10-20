@@ -39,7 +39,7 @@ data/
   help_articles/    help-center articles written for this project
 src/
   triage/           ticket classification
-  knowledge/        answering from help articles
+  answer/           drafting replies from help articles
   connectors/       Freshdesk, Google Drive and local-file data sources
 app/                web screens (agent assist and chat)
 evaluation/         accuracy tests and results
@@ -76,6 +76,19 @@ python -m evaluation.evaluate
 ```
 
 The second command is free: it compares the saved AI answers with the labels and writes `evaluation/report.md`, with scores per field, how many escalations were caught, and every mistake. For comparison, the free keyword-based fake AI (`--fake`) scores 62% on category and 51% on urgency.
+
+### Draft replies from the help articles
+
+```bash
+python -m scripts.run_answers --fake --limit 10   # free practice run
+python -m scripts.run_answers --limit 10          # real run, asks before spending
+python -m scripts.run_answers --ticket T-1001     # print one full reply
+python -m evaluation.evaluate_answers             # free check, writes evaluation/answers_report.md
+```
+
+This works in two steps. First, a local keyword search (`src/answer/retrieval.py`, using the BM25 ranking formula) picks the 3 help articles that best match the ticket. That step is free and keeps each AI call small. Then Claude writes a reply using only those articles and lists the article IDs it used. If none of the articles covers the question, Claude says so and the ticket is handed to a person, instead of the AI making up an answer. The code also checks every citation: an answer that cites an article Claude wasn't given is marked for review.
+
+The reply, its sources, and whether it was answered are written next to each ticket. The evaluation checks five tickets about topics the help center deliberately doesn't cover, which should all get "I don't know".
 
 To read tickets and articles from Google Drive instead, follow [docs/setup-google-drive.md](docs/setup-google-drive.md).
 

@@ -9,7 +9,8 @@ PRICES = {
 
 # Rough sizes used for the estimate before any call is made.
 CHARS_PER_TOKEN = 4
-EXPECTED_OUTPUT_TOKENS = 300  # the answer plus the model's short reasoning
+EXPECTED_OUTPUT_TOKENS = 300  # a triage answer plus the model's short reasoning
+EXPECTED_REPLY_TOKENS = 700  # a drafted reply is longer than a triage answer
 
 
 def cost_usd(model: str, input_tokens: int, output_tokens: int) -> float:
@@ -17,14 +18,16 @@ def cost_usd(model: str, input_tokens: int, output_tokens: int) -> float:
     return (input_tokens * price_in + output_tokens * price_out) / 1_000_000
 
 
-def estimate_ticket_tokens(system_prompt: str, message: str) -> tuple[int, int]:
+def estimate_ticket_tokens(system_prompt: str, message: str,
+                           output_tokens: int = EXPECTED_OUTPUT_TOKENS) -> tuple[int, int]:
     input_tokens = (len(system_prompt) + len(message)) // CHARS_PER_TOKEN + 50
-    return input_tokens, EXPECTED_OUTPUT_TOKENS
+    return input_tokens, output_tokens
 
 
-def estimate_run(model: str, system_prompt: str, messages: list[str]) -> float:
+def estimate_run(model: str, system_prompt: str, messages: list[str],
+                 output_tokens: int = EXPECTED_OUTPUT_TOKENS) -> float:
     total = 0.0
     for m in messages:
-        tokens_in, tokens_out = estimate_ticket_tokens(system_prompt, m)
+        tokens_in, tokens_out = estimate_ticket_tokens(system_prompt, m, output_tokens)
         total += cost_usd(model, tokens_in, tokens_out)
     return total
