@@ -24,15 +24,15 @@ Full reports with every mistake and the AI's reasoning: [version 1](evaluation/r
 
 ### Replies drafted from help articles
 
-Claude Haiku 5.5 drafted replies for all 100 tickets for about **$0.04**.
+Claude Haiku 5.5 drafted replies for all 100 tickets for about **$0.04** per run. Version 2 of the reply instructions uses a fixed, formal layout, and the code adds the "For more details, please see our help article" line and the signature, so they always match the articles actually cited.
 
-| Check | Result |
-| --- | --- |
-| Said "I don't know" on the 5 topics with no article | **5 of 5** |
-| Answered tickets that an article covers | 77 of 95 (81%) |
-| Answers citing an article from the ticket's correct category | **76 of 77 (99%)** |
+| Check | Version 1 | Version 2 |
+| --- | --- | --- |
+| Said "I don't know" on the 5 topics with no article | **5 of 5** | **5 of 5** |
+| Answered tickets that an article covers | 77 of 95 (81%) | 80 of 95 (84%) |
+| Answers citing an article from the ticket's correct category | 76 of 77 (99%) | 78 of 80 (98%) |
 
-It never made up an answer for a topic the help center doesn't cover. Most of the 18 other handoffs are fair, because the articles really don't contain the answer (theme recommendations, sales reports, size charts). A few are overly cautious: the article covered most of the question, and a partial answer plus a handoff would have helped more. Full report with sample replies: [evaluation/answers_report_v1.md](evaluation/answers_report_v1.md).
+It never made up an answer for a topic the help center doesn't cover. Most of the 18 other handoffs are fair, because the articles really don't contain the answer (theme recommendations, sales reports, size charts). A few are overly cautious: the article covered most of the question, and a partial answer plus a handoff would have helped more. Full reports with sample replies: [version 1](evaluation/answers_report_v1.md), [version 2](evaluation/answers_report_v2.md).
 
 ## Planned features
 
@@ -105,7 +105,7 @@ The reply, its sources, and whether it was answered are written next to each tic
 ### Agent assist screen
 
 ```bash
-streamlit run app/agent_assist.py
+python -m streamlit run app/agent_assist.py
 ```
 
 This opens a web page in your browser. On the left is the ticket list, sorted with escalations and the most urgent tickets first, with filters for queue, urgency and "needs a person". On the right is the selected ticket with its color-coded AI triage, the draft reply in an editable box, and the help articles it's based on. **Save reply** and **Needs a person** write the agent's version and status into their own columns (`agent_reply`, `agent_status`), so the AI's original draft is always kept for comparison. The screen only reads and saves data and never calls the AI, so it costs nothing.

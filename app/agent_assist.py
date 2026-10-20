@@ -1,7 +1,7 @@
 """Agent assist screen: each ticket with its AI triage, a draft reply the agent can edit, and the reply's sources.
 
 Run it from the project folder:
-    streamlit run app/agent_assist.py
+    python -m streamlit run app/agent_assist.py
 
 It only reads and saves data (Google Sheet or local files, depending on DATA_SOURCE). It never calls the AI,
 so using it costs nothing.
@@ -157,6 +157,8 @@ def show_ticket(v, articles) -> None:
         if ai["ai_answered"] == "no":
             st.warning(f"**The AI didn't find the answer in the help articles**, so this needs a person.  \n"
                        f"Missing: {ai['ai_missing']}")
+        elif ai["ai_missing"]:
+            st.info(f"**Note for the agent:** {ai['ai_missing']}")
         if ai["agent_status"]:
             colors = URGENCY["low"] if ai["agent_status"] == READY else URGENCY["high"]
             st.markdown(badge(ai["agent_status"], colors, "Agent: "), unsafe_allow_html=True)

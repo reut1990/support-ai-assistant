@@ -1,6 +1,6 @@
 """Instructions for drafting replies from the help articles. Kept separate so they're easy to read and improve.
 
-Version 2: replies follow a fixed, formal layout. The article reference and the signature are added by code
+Version 2: replies follow a fixed, formal layout, and notes meant for the agent go in a separate field. The article reference and the signature are added by code
 (src/answer/engine.py), so they are always correct and always look the same.
 """
 
@@ -40,6 +40,8 @@ Style for every reply:
 - if the merchant is upset, add "We apologize for the inconvenience." after the first sentence
 - don't mention articles, guides or links, and don't add a closing or signature; the system adds the article reference
   and the signature after your text
+- the merchant reads the reply, so never address the agent or "the team" in it and never refer to the merchant in the
+  third person; anything the agent should check before sending (a refund decision, an account detail) goes in missing
 - under 150 words"""
 
 
