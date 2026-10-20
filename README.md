@@ -37,7 +37,20 @@ pip install -r requirements.txt
 cp .env.example .env
 python -m scripts.check_connection   # reads the sample data in this repository
 python -m pytest                     # runs the tests
+python -m scripts.run_triage --fake  # free practice triage with a keyword-based fake AI
 ```
+
+### Triage with Claude
+
+Add your `ANTHROPIC_API_KEY` to `.env`, then:
+
+```bash
+python -m scripts.run_triage --limit 10
+```
+
+It prints the estimated cost and asks before making any API call. A `--max-cost` limit (default $0.50) stops the run if spending reaches it. With Claude Haiku 5.5, 10 tickets cost well under one cent.
+
+The AI returns each ticket's category, urgency, sentiment and churn risk, using a fixed schema so every answer is valid. Plain business rules in `src/triage/routing.py` then pick the queue, and urgent tickets or angry merchants at risk of leaving go to **Priority Escalations**. Results are written next to each ticket in the Google Sheet, or to `data/output/triage_results.csv` locally.
 
 To read tickets and articles from Google Drive instead, follow [docs/setup-google-drive.md](docs/setup-google-drive.md).
 
