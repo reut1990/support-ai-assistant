@@ -6,6 +6,20 @@ It triages incoming merchant tickets (category, urgency, sentiment, churn risk),
 
 > 🚧 Work in progress. This README will be rewritten when the project is complete.
 
+## Results so far
+
+Claude Haiku 5.5 triaged all 100 labeled tickets for about **$0.02** in total.
+
+| | Keyword baseline | Claude Haiku 5.5 |
+| --- | --- | --- |
+| Category | 62% | **99%** |
+| Urgency | 51% | **66%** (100% within one level) |
+| Sentiment | 60% | **69%** (100% within one level) |
+| Churn risk | 75% | **80%** (100% within one level) |
+| Escalations caught | 9 of 12, 12 false alarms | **9 of 12, 2 false alarms** |
+
+Every miss on urgency, sentiment and churn risk is one level off, and most are borderline cases such as how-to questions labeled medium urgency. Full details, including every mistake and the AI's reasoning: [evaluation/report.md](evaluation/report.md).
+
 ## Planned features
 
 1. **Triage engine:** tags each ticket and routes it to the right queue.
@@ -59,7 +73,7 @@ python -m scripts.run_triage --limit 100
 python -m evaluation.evaluate
 ```
 
-The second command is free: it compares the saved AI answers with the labels and writes [evaluation/report.md](evaluation/report.md), with scores per field, how many escalations were caught, and every mistake. For comparison, the free keyword-based fake AI (`--fake`) scores 62% on category and 51% on urgency.
+The second command is free: it compares the saved AI answers with the labels and writes `evaluation/report.md`, with scores per field, how many escalations were caught, and every mistake. For comparison, the free keyword-based fake AI (`--fake`) scores 62% on category and 51% on urgency.
 
 To read tickets and articles from Google Drive instead, follow [docs/setup-google-drive.md](docs/setup-google-drive.md).
 
