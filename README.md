@@ -8,19 +8,19 @@ It triages incoming merchant tickets (category, urgency, sentiment, churn risk),
 
 ## Results so far
 
-Claude Haiku 5.5 triaged all 100 labeled tickets for about **$0.02** in total.
+Claude Haiku 5.5 triaged all 100 labeled tickets for about **$0.02** per run.
 
-| | Keyword baseline | Claude Haiku 5.5 |
-| --- | --- | --- |
-| Category | 62% | **99%** |
-| Urgency | 51% | **66%** (100% within one level) |
-| Sentiment | 60% | **69%** (100% within one level) |
-| Churn risk | 75% | **80%** (100% within one level) |
-| Escalations caught | 9 of 12, 12 false alarms | **9 of 12, 2 false alarms** |
+| | Keyword baseline | Claude, instructions v1 | Claude, instructions v2 |
+| --- | --- | --- | --- |
+| Category | 62% | 99% | **99%** |
+| Urgency | 51% | 66% | **70%** |
+| Sentiment | 60% | 69% | **84%** |
+| Churn risk | 75% | 80% | **87%** |
+| Escalations caught | 9 of 12, 12 false alarms | 9 of 12, 2 false alarms | **11 of 12, 2 false alarms** |
 
-Every miss on urgency, sentiment and churn risk is one level off, and most are borderline cases such as how-to questions labeled medium urgency. Full details, including every mistake and the AI's reasoning: [evaluation/report_v1.md](evaluation/report_v1.md).
+Every miss on urgency, sentiment and churn risk is one level off. Version 2 of the instructions (`src/triage/prompt.py`) was written by reading the version 1 mistakes: clearer urgency levels, a list of anger signals, and churn rules tied to leaving or losing sales. Because it was tuned on these same 100 tickets, the fairest next check is a set of new tickets it has never seen.
 
-The instructions are being improved based on these mistakes (version 2 in `src/triage/prompt.py`).
+Full reports with every mistake and the AI's reasoning: [version 1](evaluation/report_v1.md), [version 2](evaluation/report_v2.md).
 
 ## Planned features
 
