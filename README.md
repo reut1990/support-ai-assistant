@@ -22,6 +22,18 @@ Every miss on urgency, sentiment and churn risk is one level off. Version 2 of t
 
 Full reports with every mistake and the AI's reasoning: [version 1](evaluation/report_v1.md), [version 2](evaluation/report_v2.md).
 
+### Replies drafted from help articles
+
+Claude Haiku 5.5 drafted replies for all 100 tickets for about **$0.04**.
+
+| Check | Result |
+| --- | --- |
+| Said "I don't know" on the 5 topics with no article | **5 of 5** |
+| Answered tickets that an article covers | 77 of 95 (81%) |
+| Answers citing an article from the ticket's correct category | **76 of 77 (99%)** |
+
+It never made up an answer for a topic the help center doesn't cover. Most of the 18 other handoffs are fair, because the articles really don't contain the answer (theme recommendations, sales reports, size charts). A few are overly cautious: the article covered most of the question, and a partial answer plus a handoff would have helped more. Full report with sample replies: [evaluation/answers_report_v1.md](evaluation/answers_report_v1.md).
+
 ## Planned features
 
 1. **Triage engine:** tags each ticket and routes it to the right queue.
