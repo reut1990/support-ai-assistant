@@ -93,7 +93,9 @@ def test_runner_fake_mode_writes_results(tmp_path, monkeypatch, capsys):
     assert len((tmp_path / "results.csv").read_text().strip().splitlines()) == 6
 
 
-def test_runner_real_mode_cancels_without_spending(monkeypatch, capsys):
+def test_runner_real_mode_cancels_without_spending(tmp_path, monkeypatch, capsys):
+    source = LocalFilesSource(results_csv=tmp_path / "results.csv")
+    monkeypatch.setattr(run_triage, "get_data_source", lambda: source)
     monkeypatch.setattr("builtins.input", lambda prompt: "n")
     monkeypatch.setattr(run_triage, "Triager", lambda **kw: pytest.fail("must not create a real client"))
     assert run_triage.main(["--limit", "10"]) == 0

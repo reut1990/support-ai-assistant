@@ -102,6 +102,14 @@ This works in two steps. First, a local keyword search (`src/answer/retrieval.py
 
 The reply, its sources, and whether it was answered are written next to each ticket. The evaluation checks five tickets about topics the help center deliberately doesn't cover, which should all get "I don't know".
 
+### Agent assist screen
+
+```bash
+streamlit run app/agent_assist.py
+```
+
+This opens a web page in your browser. On the left is the ticket list, sorted with escalations and the most urgent tickets first, with filters for queue, urgency and "needs a person". On the right is the selected ticket with its color-coded AI triage, the draft reply in an editable box, and the help articles it's based on. **Save reply** and **Needs a person** write the agent's version and status into their own columns (`agent_reply`, `agent_status`), so the AI's original draft is always kept for comparison. The screen only reads and saves data and never calls the AI, so it costs nothing.
+
 To read tickets and articles from Google Drive instead, follow [docs/setup-google-drive.md](docs/setup-google-drive.md).
 
 ## Data and credits

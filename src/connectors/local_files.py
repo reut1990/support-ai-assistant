@@ -5,7 +5,7 @@ from pathlib import Path
 
 from src import config
 from src.connectors.base import DataSource
-from src.models import AI_COLUMNS, REPLY_COLUMNS, Article, Ticket, parse_article
+from src.models import ALL_RESULT_COLUMNS, Article, Ticket, parse_article
 
 
 class LocalFilesSource(DataSource):
@@ -40,7 +40,7 @@ class LocalFilesSource(DataSource):
     def write_results(self, ticket_id: str, values: dict) -> None:
         rows = self._read_results()
         rows.setdefault(ticket_id, {"ticket_id": ticket_id}).update({k: str(v) for k, v in values.items()})
-        fields = ["ticket_id", *AI_COLUMNS, *REPLY_COLUMNS]
+        fields = ["ticket_id", *ALL_RESULT_COLUMNS]
         fields += [k for r in rows.values() for k in r if k not in fields]
         self.results_csv.parent.mkdir(parents=True, exist_ok=True)
         with self.results_csv.open("w", newline="", encoding="utf-8") as f:
