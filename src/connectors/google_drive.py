@@ -39,6 +39,14 @@ class GoogleDriveSource(DataSource):
     def list_tickets(self) -> list[Ticket]:
         return [Ticket.from_row(row) for row in self._worksheet().get_all_records()]
 
+    def list_triage(self) -> dict[str, dict]:
+        results = {}
+        for row in self._worksheet().get_all_records():
+            values = {c: str(row.get(c, "")) for c in AI_COLUMNS}
+            if values["ai_category"]:
+                results[str(row["ticket_id"])] = values
+        return results
+
     def write_triage(self, ticket_id: str, result: dict) -> None:
         ws = self._worksheet()
         header = ws.row_values(1)

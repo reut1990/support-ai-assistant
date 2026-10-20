@@ -19,3 +19,7 @@ class DataSource(ABC):
     @abstractmethod
     def write_triage(self, ticket_id: str, result: dict) -> None:
         """Saves the AI's triage result for one ticket. Keys are names from models.AI_COLUMNS."""
+
+    @abstractmethod
+    def list_triage(self) -> dict[str, dict]:
+        """Returns saved triage results as {ticket_id: {ai_column: value}}. Tickets not triaged yet are left out."""

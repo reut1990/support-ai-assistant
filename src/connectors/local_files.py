@@ -27,6 +27,12 @@ class LocalFilesSource(DataSource):
         articles = [parse_article(p.read_text(encoding="utf-8"), p.name) for p in paths]
         return sorted(articles, key=lambda a: a.article_id)
 
+    def list_triage(self) -> dict[str, dict]:
+        if not self.results_csv.exists():
+            return {}
+        with self.results_csv.open(encoding="utf-8") as f:
+            return {r["ticket_id"]: {c: r.get(c, "") for c in AI_COLUMNS} for r in csv.DictReader(f)}
+
     def write_triage(self, ticket_id: str, result: dict) -> None:
         rows = {}
         if self.results_csv.exists():

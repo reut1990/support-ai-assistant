@@ -52,6 +52,15 @@ It prints the estimated cost and asks before making any API call. A `--max-cost`
 
 The AI returns each ticket's category, urgency, sentiment and churn risk, using a fixed schema so every answer is valid. Plain business rules in `src/triage/routing.py` then pick the queue, and urgent tickets or angry merchants at risk of leaving go to **Priority Escalations**. Results are written next to each ticket in the Google Sheet, or to `data/output/triage_results.csv` locally.
 
+### Measure accuracy
+
+```bash
+python -m scripts.run_triage --limit 100
+python -m evaluation.evaluate
+```
+
+The second command is free: it compares the saved AI answers with the labels and writes [evaluation/report.md](evaluation/report.md), with scores per field, how many escalations were caught, and every mistake. For comparison, the free keyword-based fake AI (`--fake`) scores 62% on category and 51% on urgency.
+
 To read tickets and articles from Google Drive instead, follow [docs/setup-google-drive.md](docs/setup-google-drive.md).
 
 ## Data and credits
