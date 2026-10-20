@@ -14,17 +14,21 @@ NOT_COVERED = ["quickbooks", "instagram", "pre-order", "delivery date", "appeal"
 def fake_reply(text: str) -> DraftReply:
     name = re.search(r"Merchant: (\S+)", text)
     first = name.group(1) if name else "there"
+    subject = re.search(r"Subject: (.+)", text)
+    topic = subject.group(1).strip().lower() if subject else "your question"
     articles = re.findall(r'<article id="([^"]+)" title="([^"]+)"', text)
     ticket_text = text.split("Help-center articles")[0].lower()
+    opening = (f"Hello {first},\n\nThank you for contacting Storely Support. "
+               f"I understand you have a question about {topic}.")
     if not articles or any(w in ticket_text for w in NOT_COVERED):
         return DraftReply(answered=False, cited_articles=[],
-                          reply=f"Hi {first}, thanks for reaching out. I've passed your question to a specialist "
-                                "who will follow up with you shortly.\n\nStorely Support",
+                          reply=f"{opening}\n\nI have forwarded your request to a specialist on our team, "
+                                "who will follow up with you directly.",
                           missing="The fake AI found a topic the help center doesn't cover.")
-    article_id, title = articles[0]
-    return DraftReply(answered=True, cited_articles=[article_id], missing="",
-                      reply=f"Hi {first}, thanks for reaching out. Our guide \"{title}\" explains how to handle "
-                            "this. (Template reply from the fake AI, no API call.)\n\nStorely Support")
+    return DraftReply(answered=True, cited_articles=[articles[0][0]], missing="",
+                      reply=f"{opening}\n\nThis is a sample reply from the free fake AI. With the real AI, "
+                            "the answer and numbered steps appear here.\n\n"
+                            "If the issue continues, please reply to this message and we will look into it further.")
 
 
 class FakeAnswerClient:

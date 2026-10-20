@@ -62,7 +62,7 @@ def main(argv=None) -> int:
     articles = source.list_articles()
     if args.fake:
         answerer = Answerer(articles, client=FakeAnswerClient(), model=args.model)
-        print(f"Fake AI: {len(tickets)} tickets, cost $0.00 (no API calls).")
+        print(f"Fake AI: {len(tickets)} ticket{'s' if len(tickets) != 1 else ''}, cost $0.00 (no API calls).")
     else:
         # A placeholder client: this answerer only builds the messages for the estimate, so no key is needed yet.
         answerer = Answerer(articles, client=object(), model=args.model)
@@ -96,7 +96,7 @@ def main(argv=None) -> int:
             handed_off += 1
             print(f"{ticket.ticket_id}  I don't know -> hand to a person: {cols['ai_missing']}")
         if args.ticket:
-            print(f"\nSubject: {ticket.subject}\n{ticket.body}\n\n--- Draft reply ---\n{outcome.result.reply}")
+            print(f"\nSubject: {ticket.subject}\n{ticket.body}\n\n--- Draft reply ---\n{cols['ai_reply']}")
             if cols["ai_sources"]:
                 print(f"\nSources: {cols['ai_sources']}")
 

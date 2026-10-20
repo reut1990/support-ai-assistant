@@ -9,7 +9,7 @@ import pytest
 
 from evaluation import evaluate_answers
 from scripts import run_answers
-from src.answer.engine import Answerer, check_citations
+from src.answer.engine import Answerer, check_citations, format_reply
 from src.answer.fake_client import FakeAnswerClient
 from src.answer.retrieval import ArticleSearch
 from src.answer.schema import DraftReply
@@ -120,3 +120,13 @@ def test_evaluation_counts_i_dont_know_and_sources():
     assert len(s["gaps_handed_off"]) == 1 and len(s["gaps_answered"]) == 1
     assert len(s["right_source"]) == 1
     assert "1 of 2" in evaluate_answers.build_report(s)
+
+
+def test_reply_gets_article_reference_and_one_signature():
+    sources = [a for a in ARTICLES if a.article_id in ("KB-201", "KB-203")]
+    text = format_reply("Hello Ana,\n\nThank you for contacting Storely Support.\n\nBest regards,\nStorely Support", sources)
+    assert text.count("Storely Support Team") == 1 and "Best regards" not in text
+    assert "please see our help articles “Payout schedules, delays and bank accounts” and “" in text
+    assert text.endswith("Kind regards,\nStorely Support Team")
+    handoff = format_reply("Hello Bo,\n\nI have forwarded your request.", [])
+    assert "help article" not in handoff and handoff.endswith("Storely Support Team")

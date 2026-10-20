@@ -33,7 +33,7 @@ class AnswerOutcome:
         r = self.result
         return {
             "ai_answered": "yes" if r.answered else "no",
-            "ai_reply": r.reply,
+            "ai_reply": format_reply(r.reply, self.sources),
             "ai_sources": "; ".join(f"{a.article_id} {a.title}" for a in self.sources),
             "ai_missing": r.missing or self.note,
         }
@@ -91,3 +91,24 @@ def check_citations(result: DraftReply, articles: list[Article]) -> tuple[DraftR
         note = "Needs review: the draft didn't cite any of the articles it was given."
         result = result.model_copy(update={"answered": False})
     return result, sources, note
+
+
+SIGNATURE = "Kind regards,\nStorely Support Team"
+CLOSINGS = {"storely support", "storely support team", "best,", "best regards,", "kind regards,", "regards,",
+            "thanks,", "thank you,", "sincerely,"}
+
+
+def format_reply(text: str, sources: list[Article]) -> str:
+    """Adds the help-article reference and the signature, so every reply ends the same way."""
+    lines = text.strip().splitlines()
+    while lines and (not lines[-1].strip() or lines[-1].strip().lower() in CLOSINGS):
+        lines.pop()  # drop a closing the AI added anyway
+    parts = ["\n".join(lines)]
+    if sources:
+        titles = [f"\u201c{a.title}\u201d" for a in sources]
+        if len(titles) == 1:
+            parts.append(f"For more details, please see our help article {titles[0]}.")
+        else:
+            parts.append(f"For more details, please see our help articles {', '.join(titles[:-1])} and {titles[-1]}.")
+    parts.append(SIGNATURE)
+    return "\n\n".join(parts)
