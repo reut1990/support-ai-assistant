@@ -55,6 +55,9 @@ class FakeWorksheet:
     def row_values(self, n):
         return self.rows[n - 1]
 
+    def col_values(self, n):
+        return [r[n - 1] for r in self.rows]
+
     def find(self, value, in_column):
         for i, r in enumerate(self.rows, start=1):
             if r[in_column - 1] == value:
@@ -147,3 +150,32 @@ def test_google_unknown_ticket_raises():
     source, _ = make_google_source()
     with pytest.raises(KeyError):
         source.write_triage("T-999", {})
+
+
+def test_google_write_reads_sheet_once_and_retries_rate_limit(monkeypatch):
+    source, ws = make_google_source()
+    reads = {"n": 0}
+    original = ws.col_values
+
+    def counted(n):
+        reads["n"] += 1
+        return original(n)
+
+    ws.col_values = counted
+    failures = {"left": 1}
+    original_update = ws.update
+
+    def flaky_update(values, range_name):
+        if range_name != "A1" and failures["left"]:
+            failures["left"] -= 1
+            raise type("APIError", (Exception,), {"code": 429})()
+        return original_update(values, range_name)
+
+    ws.update = flaky_update
+    monkeypatch.setattr("src.connectors.google_drive.time.sleep", lambda s: None)
+    source.write_triage("T-1", {"ai_category": "payments"})
+    source.write_triage("T-2", {"ai_category": "domains"})
+    assert reads["n"] == 1
+    header = ws.rows[0]
+    assert dict(zip(header, ws.rows[1]))["ai_category"] == "payments"
+    assert dict(zip(header, ws.rows[2]))["ai_category"] == "domains"

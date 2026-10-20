@@ -10,6 +10,7 @@ Options:
     --limit N       how many tickets (default 10)
     --model NAME    claude-haiku-5-5 (default), claude-sonnet-5-5 or claude-opus-5-5
     --max-cost USD  stop the run if actual spending reaches this amount (default 0.50)
+    --redo          triage again tickets that already have AI results (skipped by default, so you never pay twice)
     --yes           skip the confirmation question
 """
 
@@ -29,11 +30,21 @@ def main(argv=None) -> int:
     p.add_argument("--model", default=DEFAULT_MODEL)
     p.add_argument("--max-cost", type=float, default=0.50)
     p.add_argument("--fake", action="store_true", help="use the free keyword-based fake AI")
+    p.add_argument("--redo", action="store_true", help="re-triage tickets that already have results")
     p.add_argument("--yes", action="store_true")
     args = p.parse_args(argv)
 
     source = get_data_source()
     tickets = source.list_tickets()[: args.limit]
+    if not args.redo:
+        done_before = source.list_triage()
+        skipped = [t for t in tickets if t.ticket_id in done_before]
+        tickets = [t for t in tickets if t.ticket_id not in done_before]
+        if skipped:
+            print(f"Skipping {len(skipped)} tickets that already have AI results (use --redo to triage them again).")
+    if not tickets:
+        print("Nothing left to triage.")
+        return 0
     messages = [ticket_message(t.subject, t.body, t.plan, t.channel) for t in tickets]
 
     if args.fake:

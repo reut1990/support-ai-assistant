@@ -5,6 +5,8 @@ folder with that account's email address, the same way you'd share with a person
 Setup steps: docs/setup-google-drive.md
 """
 
+import time
+
 from src import config
 from src.connectors.base import DataSource
 from src.models import AI_COLUMNS, Article, Ticket, parse_article
@@ -31,10 +33,17 @@ class GoogleDriveSource(DataSource):
             gspread_client, drive_service = _connect()
         self._gc = gspread_client
         self._drive = drive_service
+        self._ws = None
+        self._header = None
+        self._rows = None  # ticket_id -> sheet row number
 
     # --- tickets (Google Sheet) -------------------------------------------
+    # Google allows about 60 Sheet reads and 60 writes per minute, so the sheet is
+    # opened once and each saved result costs a single write.
     def _worksheet(self):
-        return self._gc.open_by_key(self.sheet_id).worksheet(TICKETS_TAB)
+        if self._ws is None:
+            self._ws = _with_retry(lambda: self._gc.open_by_key(self.sheet_id).worksheet(TICKETS_TAB))
+        return self._ws
 
     def list_tickets(self) -> list[Ticket]:
         return [Ticket.from_row(row) for row in self._worksheet().get_all_records()]
@@ -49,17 +58,21 @@ class GoogleDriveSource(DataSource):
 
     def write_triage(self, ticket_id: str, result: dict) -> None:
         ws = self._worksheet()
-        header = ws.row_values(1)
-        missing = [c for c in AI_COLUMNS if c not in header]
-        if missing:
-            header = header + missing
-            ws.update([header], "A1")
-        cell = ws.find(ticket_id, in_column=1)
-        if cell is None:
+        if self._header is None:
+            header = _with_retry(lambda: ws.row_values(1))
+            missing = [c for c in AI_COLUMNS if c not in header]
+            if missing:
+                header = header + missing
+                _with_retry(lambda: ws.update([header], "A1"))
+            self._header = header
+            ids = _with_retry(lambda: ws.col_values(1))
+            self._rows = {str(v): i for i, v in enumerate(ids, start=1)}
+        row = self._rows.get(ticket_id)
+        if row is None:
             raise KeyError(f"Ticket {ticket_id} not found in the sheet.")
-        first = header.index(AI_COLUMNS[0]) + 1
+        first = self._header.index(AI_COLUMNS[0]) + 1
         values = [[result.get(c, "") for c in AI_COLUMNS]]
-        ws.update(values, f"{_col_letter(first)}{cell.row}")
+        _with_retry(lambda: ws.update(values, f"{_col_letter(first)}{row}"))
 
     # --- articles (Google Drive folder) -----------------------------------
     def list_articles(self) -> list[Article]:
@@ -102,6 +115,19 @@ def _connect():
         raise FileNotFoundError(f"Google key file not found at {path}. See docs/setup-google-drive.md.")
     creds = Credentials.from_service_account_file(str(path), scopes=SCOPES)
     return gspread.authorize(creds), build("drive", "v3", credentials=creds, cache_discovery=False)
+
+
+def _with_retry(call, attempts: int = 6, wait: float = 10.0):
+    """Runs a Google call, waiting and retrying when Google says the per-minute limit was hit."""
+    for attempt in range(attempts):
+        try:
+            return call()
+        except Exception as e:
+            if getattr(e, "code", None) != 429 or attempt == attempts - 1:
+                raise
+            delay = wait * (attempt + 1)
+            print(f"Google rate limit reached, waiting {delay:.0f} seconds...")
+            time.sleep(delay)
 
 
 def _col_letter(n: int) -> str:
