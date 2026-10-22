@@ -50,5 +50,5 @@ class FakeClaudeClient:
         return SimpleNamespace(
             parsed_output=fake_triage(text),
             stop_reason="end_turn",
-            usage=SimpleNamespace(input_tokens=(len(system) + len(text)) // 4, output_tokens=120),
+            usage=SimpleNamespace(input_tokens=0, output_tokens=0),  # the fake AI is free
         )

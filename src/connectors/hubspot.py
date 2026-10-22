@@ -18,12 +18,13 @@ API = "https://api.hubapi.com"
 GROUP = "storely_ai"
 # Ticket fields that HubSpot doesn't have built in, saved as custom properties.
 TICKET_FIELDS = ["storely_ticket_id", "storely_created_at", "customer_name", "customer_email",
-                 "store_name", "plan", "channel"]
-LONG_TEXT = {"ai_reason", "ai_reply", "ai_missing", "agent_reply"}
+                 "store_name", "plan", "channel", "chat_outcome"]
+LONG_TEXT = {"ai_reason", "ai_reply", "ai_missing", "agent_reply", "chat_outcome"}
 # HubSpot's built-in priority, set from the AI's urgency so tickets can be sorted in HubSpot itself.
 PRIORITY = {"low": "LOW", "medium": "MEDIUM", "high": "HIGH", "urgent": "HIGH"}
 TICKET_TO_CONTACT = 16  # HubSpot's id for the "ticket is linked to contact" association
 NEW_STAGE = {"hs_pipeline": "0", "hs_pipeline_stage": "1"}  # default support pipeline, stage "New"
+CLOSED_STAGE = {"hs_pipeline": "0", "hs_pipeline_stage": "4"}  # default support pipeline, stage "Closed"
 
 
 class HubSpotError(Exception):

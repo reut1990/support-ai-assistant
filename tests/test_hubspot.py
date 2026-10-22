@@ -57,6 +57,11 @@ class FakeHubSpot:
                 self.tickets[tid] = {"id": tid, "properties": dict(item["properties"]),
                                      "associations": item.get("associations", [])}
             return Response(201, {"results": []})
+        if path == "/crm/v3/objects/tickets" and method == "POST":
+            tid = str(9000 + len(self.tickets))
+            self.tickets[tid] = {"id": tid, "properties": dict(json["properties"]),
+                                 "associations": json.get("associations", [])}
+            return Response(201, {"id": tid})
         if path == "/crm/v3/objects/tickets" and method == "GET":
             ids = sorted(self.tickets)
             start = int(params.get("after", 0))

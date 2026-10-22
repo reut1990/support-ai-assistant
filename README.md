@@ -55,7 +55,7 @@ src/
   triage/           ticket classification
   answer/           drafting replies from help articles
   connectors/       HubSpot, Google Drive and local-file data sources
-app/                web screens (agent assist and chat)
+app/                web screens (agent assist and support chat)
 evaluation/         accuracy tests and results
 docs/screenshots/   images for this README
 ```
@@ -115,6 +115,22 @@ python -m streamlit run app/agent_assist.py
 This opens a web page in your browser. On the left is the ticket list, sorted with escalations and the most urgent tickets first, with filters for queue, urgency and "needs a person". On the right is the selected ticket with its color-coded AI triage, the draft reply in an editable box, and the help articles it's based on. **Save reply** and **Needs a person** write the agent's version and status into their own columns (`agent_reply`, `agent_status`), so the AI's original draft is always kept for comparison. The screen only reads and saves data and never calls the AI, so it costs nothing.
 
 To read tickets and articles from Google Drive instead, follow [docs/setup-google-drive.md](docs/setup-google-drive.md).
+
+### Support chat with human handoff
+
+```bash
+python -m streamlit run app/support_chat.py
+```
+
+A chat page for merchants. Each message goes through three checks, in order:
+
+1. **Asked for a person?** Plain code looks for phrases such as "talk to someone" or "human", and hands off right away.
+2. **Urgent?** The triage engine reads the message. Urgent issues, or angry merchants likely to leave, go straight to a person instead of the AI trying to solve them.
+3. **Covered by the help articles?** The search picks the 3 best articles and Claude answers from them only, in a formal chat style with the article named. If they don't cover the question, the chat says so and hands off.
+
+After each answer the merchant can click **Yes, that solved it**, **No, talk to a person**, or ask a follow-up. Every chat ends as a ticket: a **Closed** ticket marked "Resolved by AI" (so the share of chats the AI solves can be reported), or a **New** ticket with the full conversation, the AI's triage, the priority and the reason for the handoff, ready on the agent assist screen. With `DATA_SOURCE=hubspot` the tickets are created in HubSpot, linked to the merchant's contact.
+
+The page starts in free practice mode with a fake AI. With the real AI a message costs about $0.0007, and a chat stops itself at $0.10.
 
 ### Connect HubSpot
 

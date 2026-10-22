@@ -32,7 +32,7 @@ def compare(tickets, replies: dict[str, dict], articles) -> dict:
     rows = []
     for t in tickets:
         r = replies.get(t.ticket_id)
-        if not r:
+        if not r or not t.labels:  # chat tickets have no labels, so they can't be scored
             continue
         cited = [s.split(" ", 1)[0] for s in r["ai_sources"].split("; ") if s]
         rows.append({"ticket": t, "answered": r["ai_answered"] == "yes", "reply": r["ai_reply"],

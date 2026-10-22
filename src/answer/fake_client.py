@@ -11,7 +11,7 @@ from src.answer.schema import DraftReply
 NOT_COVERED = ["quickbooks", "instagram", "pre-order", "delivery date", "appeal"]
 
 
-def fake_reply(text: str) -> DraftReply:
+def fake_reply(text: str, chat: bool = False) -> DraftReply:
     name = re.search(r"Merchant: (\S+)", text)
     first = name.group(1) if name else "there"
     subject = re.search(r"Subject: (.+)", text)
@@ -20,6 +20,15 @@ def fake_reply(text: str) -> DraftReply:
     ticket_text = text.split("Help-center articles")[0].lower()
     opening = (f"Hello {first},\n\nThank you for contacting Storely Support. "
                f"I understand you have a question about {topic}.")
+    if chat:
+        latest = ticket_text.split("answer the merchant's latest message")[0]
+        if not articles or any(w in latest for w in NOT_COVERED):
+            return DraftReply(answered=False, cited_articles=[], reply="I will connect you with a specialist.",
+                              missing="The fake AI found a topic the help center doesn't cover.")
+        greeting = f"Hello {first},\n\n" if "this is your first reply" in ticket_text else ""
+        return DraftReply(answered=True, cited_articles=[articles[0][0]], missing="",
+                          reply=f"{greeting}This is a sample answer from the free fake AI about {topic}. With the "
+                                "real AI, the answer and numbered steps appear here.")
     if not articles or any(w in ticket_text for w in NOT_COVERED):
         return DraftReply(answered=False, cited_articles=[],
                           reply=f"{opening}\n\nI have forwarded your request to a specialist on our team, "
@@ -42,7 +51,7 @@ class FakeAnswerClient:
         self.calls += 1
         text = messages[-1]["content"]
         return SimpleNamespace(
-            parsed_output=fake_reply(text),
+            parsed_output=fake_reply(text, chat="live chat" in system),
             stop_reason="end_turn",
-            usage=SimpleNamespace(input_tokens=(len(system) + len(text)) // 4, output_tokens=150),
+            usage=SimpleNamespace(input_tokens=0, output_tokens=0),  # the fake AI is free
         )

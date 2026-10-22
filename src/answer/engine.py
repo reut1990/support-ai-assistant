@@ -40,7 +40,8 @@ class AnswerOutcome:
 
 
 class Answerer:
-    def __init__(self, articles: list[Article], client=None, model: str = DEFAULT_MODEL, effort: str = "low"):
+    def __init__(self, articles: list[Article], client=None, model: str = DEFAULT_MODEL, effort: str = "low",
+                 system_prompt: str = SYSTEM_PROMPT):
         if model not in PRICES:
             raise ValueError(f"No price known for {model}. Add it to src/triage/cost.py first.")
         if client is None:
@@ -50,6 +51,7 @@ class Answerer:
         self.client = client
         self.model = model
         self.effort = effort
+        self.system_prompt = system_prompt
 
     def find_articles(self, ticket: Ticket) -> list[Article]:
         return self.search.search(f"{ticket.subject} {ticket.body}", top=ARTICLES_PER_TICKET)
@@ -63,7 +65,7 @@ class Answerer:
             response = self.client.messages.parse(
                 model=self.model,
                 max_tokens=3000,
-                system=SYSTEM_PROMPT,
+                system=self.system_prompt,
                 messages=[{"role": "user", "content": answer_message(ticket, articles)}],
                 output_config={"effort": self.effort},
                 output_format=DraftReply,
