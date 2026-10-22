@@ -27,8 +27,8 @@ def fake_reply(text: str, chat: bool = False) -> DraftReply:
                               missing="The fake AI found a topic the help center doesn't cover.")
         greeting = f"Hello {first},\n\n" if "this is your first reply" in ticket_text else ""
         return DraftReply(answered=True, cited_articles=[articles[0][0]], missing="",
-                          reply=f"{greeting}This is a sample answer from the free fake AI about {topic}. With the "
-                                "real AI, the answer and numbered steps appear here.")
+                          reply=f"{greeting}This is a sample answer from the free fake AI to your {short_topic(topic)} "
+                                "question. With the real AI, the answer and numbered steps appear here.")
     if not articles or any(w in ticket_text for w in NOT_COVERED):
         return DraftReply(answered=False, cited_articles=[],
                           reply=f"{opening}\n\nI have forwarded your request to a specialist on our team, "
@@ -38,6 +38,12 @@ def fake_reply(text: str, chat: bool = False) -> DraftReply:
                       reply=f"{opening}\n\nThis is a sample reply from the free fake AI. With the real AI, "
                             "the answer and numbered steps appear here.\n\n"
                             "If the issue continues, please reply to this message and we will look into it further.")
+
+
+def short_topic(text: str) -> str:
+    """A one-word summary of the question, such as "shipping", so the reply doesn't repeat it word for word."""
+    from src.triage.fake_client import fake_triage
+    return fake_triage(text).category
 
 
 class FakeAnswerClient:
