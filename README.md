@@ -120,6 +120,12 @@ To read tickets and articles from Google Drive instead, follow [docs/setup-googl
 
 Tickets can live in HubSpot, a real helpdesk, instead of a spreadsheet. The connector reads tickets from HubSpot's API and writes the AI's triage and draft reply back onto each ticket as properties, and sets HubSpot's own priority from the AI's urgency. Setup takes a few minutes on HubSpot's free plan: [docs/setup-hubspot.md](docs/setup-hubspot.md).
 
+![The 100 Storely tickets in HubSpot's ticket board](docs/screenshots/hubspot-tickets.png)
+
+With `DATA_SOURCE=hubspot`, the agent assist screen reads from HubSpot. Here it shows a private note for the agent above the draft reply:
+
+![Agent assist screen reading from HubSpot](docs/screenshots/agent-assist-hubspot.png)
+
 ## Data and credits
 
 All tickets, customers and companies are fictional. Help-article topics are inspired by common questions in the public [Shopify Help Center](https://help.shopify.com), but every article is written from scratch for this project.
