@@ -1,8 +1,8 @@
 """Instructions for drafting replies from the help articles. Kept separate so they're easy to read and improve.
 
-Version 2: replies follow a fixed, formal layout.
-Version 3: notes meant for the agent go in a separate field, never in the reply to the merchant. The article reference and the signature are added by code
+Version 2: replies follow a fixed, formal layout. The article reference and the signature are added by code
 (src/answer/engine.py), so they are always correct and always look the same.
+Version 3: notes meant for the agent go in a separate field, never in the reply to the merchant.
 """
 
 PROMPT_VERSION = "v3"
