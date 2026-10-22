@@ -26,13 +26,15 @@ Full reports with every mistake and the AI's reasoning: [version 1](evaluation/r
 
 Claude Haiku 5.5 drafted replies for all 100 tickets for about **$0.04** per run. Version 2 of the reply instructions uses a fixed, formal layout, and the code adds the "For more details, please see our help article" line and the signature, so they always match the articles actually cited.
 
-| Check | Version 1 | Version 2 |
-| --- | --- | --- |
-| Said "I don't know" on the 5 topics with no article | **5 of 5** | **5 of 5** |
-| Answered tickets that an article covers | 77 of 95 (81%) | 80 of 95 (84%) |
-| Answers citing an article from the ticket's correct category | 76 of 77 (99%) | 78 of 80 (98%) |
+| Check | Version 1 | Version 2 | Version 3 |
+| --- | --- | --- | --- |
+| Said "I don't know" on the 5 topics with no article | **5 of 5** | **5 of 5** | **5 of 5** |
+| Answered tickets that an article covers | 77 of 95 (81%) | 80 of 95 (84%) | 79 of 95 (83%) |
+| Answers citing an article from the ticket's correct category | 76 of 77 (99%) | 78 of 80 (98%) | 77 of 79 (97%) |
 
-It never made up an answer for a topic the help center doesn't cover. Most of the 18 other handoffs are fair, because the articles really don't contain the answer (theme recommendations, sales reports, size charts). A few are overly cautious: the article covered most of the question, and a partial answer plus a handoff would have helped more. Full reports with sample replies: [version 1](evaluation/answers_report_v1.md), [version 2](evaluation/answers_report_v2.md).
+Version 3 fixed a problem found by reading the version 2 replies: one reply to a merchant ended with a sentence meant for the agent ("please check with the team before promising one to the merchant"). Notes for the agent now go in a separate private field, which the agent assist screen shows above the draft.
+
+It never made up an answer for a topic the help center doesn't cover. Most of the 18 other handoffs are fair, because the articles really don't contain the answer (theme recommendations, sales reports, size charts). A few are overly cautious: the article covered most of the question, and a partial answer plus a handoff would have helped more. Full reports with sample replies: [version 1](evaluation/answers_report_v1.md), [version 2](evaluation/answers_report_v2.md), [version 3](evaluation/answers_report_v3.md).
 
 ## Planned features
 
