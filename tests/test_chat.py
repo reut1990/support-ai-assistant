@@ -132,3 +132,12 @@ def test_chat_page_runs_in_practice_mode(tmp_path, monkeypatch):
     assert not at.exception
     at.button(key="solved").click().run()
     assert "Closed" in (tmp_path / "chats.csv").read_text()
+
+
+def test_follow_up_on_a_new_topic_finds_its_own_article():
+    agent, _ = make_agent()
+    s = new_session()
+    agent.handle(s, "How do I offer free shipping on orders over $50?")
+    agent.handle(s, "How do I add a discount code?")
+    assert [a.article_id for a in s.messages[-1].sources] == ["KB-401"]
+    assert "fake AI" not in s.messages[-1].text

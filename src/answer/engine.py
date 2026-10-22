@@ -59,8 +59,10 @@ class Answerer:
     def message_for(self, ticket: Ticket) -> str:
         return answer_message(ticket, self.find_articles(ticket))
 
-    def answer(self, ticket: Ticket) -> AnswerOutcome:
-        articles = self.find_articles(ticket)
+    def answer(self, ticket: Ticket, search_text: str | None = None) -> AnswerOutcome:
+        """search_text, when given, replaces the ticket text for finding articles (the chat uses the latest message)."""
+        articles = (self.search.search(search_text, top=ARTICLES_PER_TICKET) if search_text
+                    else self.find_articles(ticket))
         try:
             response = self.client.messages.parse(
                 model=self.model,

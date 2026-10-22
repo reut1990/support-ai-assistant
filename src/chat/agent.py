@@ -135,7 +135,7 @@ class ChatAgent:
             return self.hand_off(session, "urgent")
 
         try:
-            outcome = self.answerer.answer(self._question(session))
+            outcome = self.answerer.answer(self._question(session), search_text=self._search_text(session))
         except AnswerError:
             return self.hand_off(session, "error")
         session.cost_usd += outcome.cost_usd
@@ -177,6 +177,13 @@ class ChatAgent:
         session.cost_usd += outcome.cost_usd
         session.triage = outcome.as_columns()
         return True
+
+    def _search_text(self, session: ChatSession) -> str:
+        # Search on the latest message. A short follow-up ("and for Canada?") also uses the message before it.
+        texts = session.merchant_texts()
+        if len(texts) > 1 and len(texts[-1].split()) < 5:
+            return f"{texts[-2]} {texts[-1]}"
+        return texts[-1]
 
     def _question(self, session: ChatSession) -> Ticket:
         # The search and the AI focus on the latest message, with the conversation for context.

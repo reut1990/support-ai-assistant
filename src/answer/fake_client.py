@@ -1,6 +1,7 @@
-"""A free stand-in for Claude that drafts template replies, so replies can be tried and tested without an API key.
+"""A free stand-in for Claude that drafts simple replies, so replies can be tried and tested without an API key.
 
-It "answers" from the first article it was given, unless the ticket mentions a topic the help center doesn't cover.
+It copies the best-matching section of the first article it was given, unless the ticket mentions a topic the help
+center doesn't cover. Its replies are much less precise than the real AI's.
 """
 
 import re
@@ -27,17 +28,30 @@ def fake_reply(text: str, chat: bool = False) -> DraftReply:
                               missing="The fake AI found a topic the help center doesn't cover.")
         greeting = f"Hello {first},\n\n" if "this is your first reply" in ticket_text else ""
         return DraftReply(answered=True, cited_articles=[articles[0][0]], missing="",
-                          reply=f"{greeting}This is a sample answer from the free fake AI to your {short_topic(topic)} "
-                                "question. With the real AI, the answer and numbered steps appear here.")
+                          reply=f"{greeting}Here is how to resolve your {short_topic(topic)} question.\n\n"
+                                f"{best_section(text, topic)}")
     if not articles or any(w in ticket_text for w in NOT_COVERED):
         return DraftReply(answered=False, cited_articles=[],
                           reply=f"{opening}\n\nI have forwarded your request to a specialist on our team, "
                                 "who will follow up with you directly.",
                           missing="The fake AI found a topic the help center doesn't cover.")
     return DraftReply(answered=True, cited_articles=[articles[0][0]], missing="",
-                      reply=f"{opening}\n\nThis is a sample reply from the free fake AI. With the real AI, "
-                            "the answer and numbered steps appear here.\n\n"
+                      reply=f"{opening}\n\n{best_section(text, topic)}\n\n"
                             "If the issue continues, please reply to this message and we will look into it further.")
+
+
+def best_section(text: str, question: str) -> str:
+    """The section of the first article that shares the most words with the question, without its heading."""
+    body = re.search(r'<article id="[^"]+" title="[^"]+">\n(.*?)</article>', text, re.S)
+    if not body:
+        return ""
+    words = set(re.findall(r"[a-z0-9$]{3,}", question.lower()))
+    sections = [p.strip() for p in re.split(r"^#{2,3} ", body.group(1), flags=re.M)[1:] if p.strip()]
+    if not sections:
+        return body.group(1).strip()
+    best = max(sections, key=lambda p: len(words & set(re.findall(r"[a-z0-9$]{3,}", p.lower()))))
+    lines = best.splitlines()[1:]  # drop the heading
+    return "\n".join(l for l in lines if l.strip()).replace("**", "").strip()
 
 
 def short_topic(text: str) -> str:
