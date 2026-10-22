@@ -42,7 +42,7 @@ It never made up an answer for a topic the help center doesn't cover. Most of th
 2. **Help-center answers:** answers only from the help articles and cites them.
 3. **Agent assist:** a screen showing triage results and an editable draft reply.
 4. **Support chat agent:** answers customers directly and hands off to a human when needed.
-5. **Integrations:** Freshdesk and Google Drive (Sheets and Docs), with local sample data as a fallback.
+5. **Integrations:** HubSpot (helpdesk tickets) and Google Drive (Sheets and Docs), with local sample data as a fallback.
 6. **Evaluation:** triage accuracy measured against labeled sample tickets.
 
 ## Project layout
@@ -54,7 +54,7 @@ data/
 src/
   triage/           ticket classification
   answer/           drafting replies from help articles
-  connectors/       Freshdesk, Google Drive and local-file data sources
+  connectors/       HubSpot, Google Drive and local-file data sources
 app/                web screens (agent assist and chat)
 evaluation/         accuracy tests and results
 docs/screenshots/   images for this README
@@ -115,6 +115,10 @@ python -m streamlit run app/agent_assist.py
 This opens a web page in your browser. On the left is the ticket list, sorted with escalations and the most urgent tickets first, with filters for queue, urgency and "needs a person". On the right is the selected ticket with its color-coded AI triage, the draft reply in an editable box, and the help articles it's based on. **Save reply** and **Needs a person** write the agent's version and status into their own columns (`agent_reply`, `agent_status`), so the AI's original draft is always kept for comparison. The screen only reads and saves data and never calls the AI, so it costs nothing.
 
 To read tickets and articles from Google Drive instead, follow [docs/setup-google-drive.md](docs/setup-google-drive.md).
+
+### Connect HubSpot
+
+Tickets can live in HubSpot, a real helpdesk, instead of a spreadsheet. The connector reads tickets from HubSpot's API and writes the AI's triage and draft reply back onto each ticket as properties, and sets HubSpot's own priority from the AI's urgency. Setup takes a few minutes on HubSpot's free plan: [docs/setup-hubspot.md](docs/setup-hubspot.md).
 
 ## Data and credits
 

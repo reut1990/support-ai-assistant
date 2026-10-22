@@ -12,6 +12,7 @@ def get_data_source(name: str | None = None) -> DataSource:
     if name == "google":
         from src.connectors.google_drive import GoogleDriveSource
         return GoogleDriveSource()
-    if name == "freshdesk":
-        raise NotImplementedError("The Freshdesk connector is added in Step 9.")
-    raise ValueError(f"Unknown DATA_SOURCE '{name}'. Use local, google or freshdesk.")
+    if name == "hubspot":
+        from src.connectors.hubspot import HubSpotSource
+        return HubSpotSource()
+    raise ValueError(f"Unknown DATA_SOURCE '{name}'. Use local, google or hubspot.")
