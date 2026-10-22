@@ -21,6 +21,13 @@ You need to be a super admin, which you are on your own account.
 5. Click **Create app**, then **Continue creating**.
 6. Open the **Auth** tab, click **Show token**, then **Copy**.
 
+**Or use a service key** (HubSpot's newer option, which works the same way): **Development** > **Keys** >
+**Service Keys** > create a key named `Support AI Assistant` with the scopes `crm.objects.tickets.read`,
+`crm.objects.tickets.write`, `crm.schemas.tickets.read`, `crm.schemas.tickets.write`, `crm.objects.contacts.read` and
+`crm.objects.contacts.write`, then copy the key.
+
+Don't use the **Developer API Key**: it manages app settings and can't read tickets.
+
 HubSpot moves menus around from time to time. Their current guide is
 [here](https://developers.hubspot.com/docs/apps/legacy-apps/private-apps/overview).
 
