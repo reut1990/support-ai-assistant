@@ -14,6 +14,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # so "src" can be imported when run by Streamlit
 
 import streamlit as st
+import streamlit.components.v1 as components
 
 from src.answer.engine import Answerer
 from src.answer.schema import ChatReply
@@ -113,6 +114,21 @@ def show_messages(session: ChatSession) -> None:
                 st.markdown(f'<div class="sc-source">For more details, see {line}.</div>', unsafe_allow_html=True)
 
 
+def scroll_to_latest(session: ChatSession) -> None:
+    """Streamlit redraws the page after every message, which can leave it scrolled up. Jump to the newest message."""
+    components.html(f"""<script>
+      // {len(session.messages)} messages: the number changes each time, so the script runs again
+      const doc = window.parent.document;
+      setTimeout(() => {{
+        for (const sel of ['[data-testid="stMain"]', 'section.main', '[data-testid="stAppViewContainer"]']) {{
+          const el = doc.querySelector(sel);
+          if (el) el.scrollTo({{top: el.scrollHeight, behavior: "smooth"}});
+        }}
+        window.parent.scrollTo({{top: doc.body.scrollHeight, behavior: "smooth"}});
+      }}, 150);
+    </script>""", height=0)
+
+
 def show_end(session: ChatSession) -> None:
     # What the merchant sees. Ticket numbers and handoff reasons are internal, so they stay in the demo panel.
     st.caption("This chat has ended. You can start a new chat at any time.")
@@ -173,8 +189,10 @@ def main() -> None:
             chat.decline_offer(session)
             st.rerun()
     if not session.is_open:
+        scroll_to_latest(session)
         show_end(session)
         return
+    scroll_to_latest(session)
     text = st.chat_input("Type your message")
     if text:
         # Show the merchant's message straight away, while the assistant works on the answer.
