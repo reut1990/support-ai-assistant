@@ -40,20 +40,26 @@ def fake_chat_reply(text: str, latest: str, articles: list, ticket_text: str) ->
         return ChatReply(answered=False, cited_articles=[], reply="I will connect you with a specialist.",
                          missing="The fake AI found a topic the help center doesn't cover.")
     earlier = ticket_text.split("answer the merchant's latest message")[0]
-    asked_already = "could you tell me" in earlier or "closest to your problem" in earlier
+    asked_already = "tell me a bit more" in earlier or "reply with the number" in earlier
     numbered = dict(re.findall(r"^(\d)\. (.+)$", text.split("Help-center articles")[0], re.M))
     lines = [numbered.get(l.strip(), l) for l in merchant_lines(text)]  # "2" means the second choice
     question = " ".join(lines) if asked_already else latest
     section, heading, overlap = match_section(text, question)
     if overlap >= 2:
         return ChatReply(answered=True, cited_articles=[articles[0][0]], missing="",
-                         reply=("Thank you for the details. " if asked_already else "") + "Here is how to resolve this:\n\n"
+                         reply=opening_line(latest, asked_already) + "\n\n"
                                f"{section}")
     if not asked_already:
         return ChatReply(answered=False, needs_detail=True, cited_articles=[], missing="",
-                         reply="Which of these is closest to your problem?", options=likely_cases(text, latest))
+                         reply="Happy to help with that. Which of these do you mean?", options=likely_cases(text, latest))
     return ChatReply(answered=False, cited_articles=[], reply="I will connect you with a specialist.",
                      missing="The fake AI couldn't match the merchant's words to a help-article section.")
+
+
+def opening_line(latest: str, asked_already: bool) -> str:
+    if re.fullmatch(r"\W*\d\W*", latest):
+        return "Sure. Here is how to do that:"  # the merchant picked a numbered choice
+    return "Thank you, that helps. Here is what to do:" if asked_already else "Here is how to resolve this:"
 
 
 LOGIN_WORDS = {"login", "log", "sign", "signin", "access", "password", "code", "lock"}

@@ -74,7 +74,7 @@ def test_uncovered_topic_says_i_dont_know():
     agent, _ = make_agent()
     s = new_session()
     agent.handle(s, "Is there a way to sync my orders with QuickBooks?")
-    assert s.status == "handed_off" and "don't have enough information" in s.messages[-1].text
+    assert s.status == "handed_off" and "needs a closer look" in s.messages[-1].text
     assert s.note_for_agent
 
 
@@ -224,7 +224,7 @@ def test_ai_says_not_covered_for_vague_message_still_asks(monkeypatch):
     agent.answerer.answer = lambda *a, **k: no
     s = new_session()
     agent.handle(s, "cant log in")
-    assert s.is_open and "tell me a little more" in s.messages[-1].text
+    assert s.is_open and "tell me a bit more" in s.messages[-1].text
     agent.handle(s, "help")
     assert s.is_open  # second question
     agent.handle(s, "still")
@@ -261,6 +261,6 @@ def test_none_of_these_asks_once_more_then_hands_off():
     s = new_session()
     agent.handle(s, "cant login")
     agent.handle(s, "no")
-    assert s.is_open and "tell me a little more" in s.messages[-1].text
+    assert s.is_open and "tell me a bit more" in s.messages[-1].text
     agent.handle(s, "none of the above")
     assert s.status == "handed_off"

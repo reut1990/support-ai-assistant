@@ -34,10 +34,12 @@ NONE_OF_THESE = re.compile(r"\W*(no|nope|none|neither|nothing|other|something el
 FOLLOW_UPS_BEFORE_OFFER = 3
 SHORT_MESSAGE_WORDS = 4  # fewer search words than this is too vague to hand off on
 MAX_CLARIFYING_QUESTIONS = 2  # ask for more detail at most twice before handing off
-CHOICE_QUESTION = "I would be glad to help. Which of these is closest to your problem?"
-CHOICE_FOOTER = "You can reply with the number, or describe the problem in your own words."
-CLARIFY_FALLBACK = ("I would like to help with this. Could you tell me a little more about what is happening, for "
-                    "example what you were trying to do and any message you see?")
+CHOICE_QUESTION = "Happy to help with that. Which of these do you mean?"
+CHOICE_FOOTER = "Just reply with the number, or tell me in your own words."
+OPEN_QUESTION = ("Happy to help. Could you tell me a bit more about what you need? For example, what you were "
+                 "trying to do and any message you see.")
+CLARIFY_FALLBACK = ("No problem, let's try another way. Could you tell me a bit more about what you need? For "
+                    "example, what you were trying to do and any message you see.")
 MAX_COST_PER_CHAT = 0.10
 REPEAT_SIMILARITY = 0.8  # a new answer this close to the previous one is a repeat
 
@@ -49,8 +51,9 @@ HANDOFF_MESSAGES = {
              "by email at {email}.",
     "urgent": "I understand this is urgent. I have passed your conversation to a specialist on our team as a "
               "priority, and they will contact you by email at {email}.",
-    "not_covered": "I don't have enough information to answer this correctly, so I have passed your conversation to "
-                   "a specialist on our team. They will follow up with you by email at {email}.",
+    "not_covered": "Thank you for bearing with me. This needs a closer look than I can give you here, so I have "
+                   "passed your conversation to a specialist on our team. They will follow up with you by email at "
+                   "{email}.",
     "not_solved": "I am sorry this didn't solve your problem. I have passed your conversation to a specialist on our "
                   "team, who will follow up with you by email at {email}.",
     "pushed_back": "I understand. I have passed your conversation to a specialist on our team, who can look at your "
@@ -195,7 +198,8 @@ class ChatAgent:
                 options = list(getattr(r, "options", []))
                 if len(options) < 2 and getattr(outcome, "searched", None):
                     options = cases_from_article(outcome.searched[0], text)  # the AI gave no choices
-                session.messages.append(Message("assistant", self._clarifying_question(session, options)))
+                question = _drop_greeting(r.reply) if getattr(r, "needs_detail", False) else ""
+                session.messages.append(Message("assistant", self._clarifying_question(session, options, question)))
                 session.questions_asked += 1
                 return
             return self.hand_off(session, "not_covered")
@@ -241,13 +245,18 @@ class ChatAgent:
         return True
 
     @staticmethod
-    def _clarifying_question(session: ChatSession, options: list[str]) -> str:
-        """First question: numbered choices, so the merchant can just pick one. Second question: an open one."""
+    def _clarifying_question(session: ChatSession, options: list[str], question: str = "") -> str:
+        """First question: numbered choices, so the merchant can just pick one. Second question: an open one.
+        The AI writes the question in its own words; the code lays out the choices the same way every time."""
         options = [o.strip().rstrip(".") for o in options if o.strip()][:4]
+        options = [o for o in options if not o.lower().startswith("something else")]  # the footer says that
         if session.questions_asked == 0 and len(options) >= 2:
             session.options = options
             lines = "\n".join(f"{i}. {o}" for i, o in enumerate(options, 1))
-            return f"{CHOICE_QUESTION}\n\n{lines}\n\n{CHOICE_FOOTER}"
+            question = question.strip() if "?" in question and len(question) < 200 else CHOICE_QUESTION
+            return f"{question}\n\n{lines}\n\n{CHOICE_FOOTER}"
+        if session.questions_asked == 0:
+            return question.strip() if "?" in question and len(question) < 300 else OPEN_QUESTION
         return CLARIFY_FALLBACK
 
     @staticmethod

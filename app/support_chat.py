@@ -51,7 +51,10 @@ def ticket_store():
     return chat_tickets()
 
 
+@st.cache_resource(show_spinner=False)
 def agent(fake: bool) -> ChatAgent:
+    # Built once and shared: loading the help articles (from Google Drive when it's set up) and the AI client
+    # takes a few seconds, so it happens while the merchant fills in the start form.
     if fake:
         triager = Triager(client=FakeClaudeClient())
         answerer = Answerer(articles(), client=FakeAnswerClient(), system_prompt=SYSTEM_PROMPT, output_format=ChatReply)
@@ -141,10 +144,12 @@ def main() -> None:
     session = st.session_state.get("chat")
     if session is None:
         start_form()
+        agent(fake)  # load in the background of the form, so starting the chat is instant
         return
 
-    chat = agent(fake)
     show_messages(session)
+    with st.spinner("Connecting you to Storely Support..."):
+        chat = agent(fake)
     demo_panel(session)
     if session.awaiting_feedback:
         prompt = ("Did this solve your problem? You can also ask a follow-up question."
