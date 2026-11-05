@@ -62,7 +62,7 @@ def badge(text: str, colors: tuple[str, str], prefix: str = "") -> str:
     return f'<span class="sa-badge" style="background:{bg};color:{fg}">{html.escape(prefix + text)}</span>'
 
 
-@st.cache_resource
+@st.cache_resource(show_spinner=False)
 def data_source():
     return get_data_source()
 

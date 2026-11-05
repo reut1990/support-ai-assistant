@@ -41,12 +41,12 @@ CSS = """
 """
 
 
-@st.cache_resource
+@st.cache_resource(show_spinner=False)
 def articles():
     return get_data_source().list_articles()
 
 
-@st.cache_resource
+@st.cache_resource(show_spinner=False)
 def ticket_store():
     return chat_tickets()
 
