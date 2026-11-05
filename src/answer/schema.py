@@ -15,3 +15,6 @@ class ChatReply(DraftReply):
     needs_detail: bool = Field(default=False, description=(
         "Chat only. True when the latest message is too short or vague to know which help applies. Then reply is "
         "one short clarifying question, answered is false and cited_articles is empty."))
+    options: list[str] = Field(default_factory=list, description=(
+        "Chat only, with needs_detail. 2 to 4 short choices in the merchant's own words, such as \"I forgot my "
+        "password\". Empty otherwise."))

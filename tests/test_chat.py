@@ -208,7 +208,7 @@ def test_vague_message_gets_a_question_before_any_hand_off():
     agent.handle(s, "cant log in")
     question = s.messages[-1]
     assert s.is_open and "?" in question.text and not question.answered
-    assert "- Locked out after resetting your password" in question.text  # the likely cases, one per line
+    assert "\n2. I'm locked out after resetting my password" in question.text  # numbered, in the merchant's words
     agent.handle(s, "it says my account is locked after I reset my password")
     reply = s.messages[-1]
     assert reply.answered and "30 minutes" in reply.text and not reply.text.startswith("Hello")
@@ -244,3 +244,23 @@ def test_replies_never_greet_again():
     from src.chat.agent import _drop_greeting
     assert _drop_greeting("Hello vcxv,\n\nCould you tell me more?") == "Could you tell me more?"
     assert _drop_greeting("Hello, I see.") == "Hello, I see."
+
+
+def test_merchant_can_pick_a_choice_by_number():
+    agent, _ = make_agent()
+    s = new_session()
+    agent.handle(s, "cant login")
+    agent.handle(s, "2")
+    assert s.messages[-2].text == "2"  # shown as typed
+    assert s.messages[-1].answered and "30 minutes" in s.messages[-1].text
+
+
+def test_none_of_these_asks_once_more_then_hands_off():
+    # Reut's test: "no" to the choices.
+    agent, _ = make_agent()
+    s = new_session()
+    agent.handle(s, "cant login")
+    agent.handle(s, "no")
+    assert s.is_open and "tell me a little more" in s.messages[-1].text
+    agent.handle(s, "none of the above")
+    assert s.status == "handed_off"

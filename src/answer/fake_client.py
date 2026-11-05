@@ -39,20 +39,47 @@ def fake_chat_reply(text: str, latest: str, articles: list, ticket_text: str) ->
     if not articles or any(w in latest for w in NOT_COVERED):
         return ChatReply(answered=False, cited_articles=[], reply="I will connect you with a specialist.",
                          missing="The fake AI found a topic the help center doesn't cover.")
-    asked_already = "could you tell me" in ticket_text.split("answer the merchant's latest message")[0]
-    question = " ".join(merchant_lines(text)) if asked_already else latest
+    earlier = ticket_text.split("answer the merchant's latest message")[0]
+    asked_already = "could you tell me" in earlier or "closest to your problem" in earlier
+    numbered = dict(re.findall(r"^(\d)\. (.+)$", text.split("Help-center articles")[0], re.M))
+    lines = [numbered.get(l.strip(), l) for l in merchant_lines(text)]  # "2" means the second choice
+    question = " ".join(lines) if asked_already else latest
     section, heading, overlap = match_section(text, question)
     if overlap >= 2:
         return ChatReply(answered=True, cited_articles=[articles[0][0]], missing="",
                          reply=("Thank you for the details. " if asked_already else "") + "Here is how to resolve this:\n\n"
                                f"{section}")
     if not asked_already:
-        cases = "\n".join(f"- {h}" for h in section_headings(text)[:4])
         return ChatReply(answered=False, needs_detail=True, cited_articles=[], missing="",
-                         reply=f"I would be glad to help. Could you tell me which of these is closest to your "
-                               f"problem?\n\n{cases}")
+                         reply="Which of these is closest to your problem?", options=likely_cases(text, latest))
     return ChatReply(answered=False, cited_articles=[], reply="I will connect you with a specialist.",
                      missing="The fake AI couldn't match the merchant's words to a help-article section.")
+
+
+LOGIN_WORDS = {"login", "log", "sign", "signin", "access", "password", "code", "lock"}
+
+
+def likely_cases(text: str, question: str) -> list[str]:
+    """Up to 3 article sections that fit the question, written the way a merchant would say them."""
+    words = set(tokens(question)) - FILLER
+    if words & LOGIN_WORDS:
+        words |= LOGIN_WORDS  # "cant login" can mean a password, a code or a lock problem
+    ranked = sorted(_sections(text), key=lambda p: -len(words & set(tokens(p))))
+    return [as_merchant_words(p.splitlines()[0]) for p in ranked[:3]]
+
+
+def as_merchant_words(heading: str) -> str:
+    """A section heading as the merchant would say it: "Two-step verification codes not arriving" ->
+    "My two-step verification codes are not arriving"."""
+    h = heading.strip()
+    h = re.sub(r"^If you think your\b", "I think my", h)
+    h = re.sub(r"\byour\b", "my", h)
+    if re.match(r"^(Locked|Unable|Stuck)\b", h):
+        return "I'm " + h[0].lower() + h[1:]
+    m = re.match(r"^(.+?) not (\w+ing)\b(.*)$", h)
+    if m:
+        return f"My {m.group(1)[0].lower() + m.group(1)[1:]} are not {m.group(2)}{m.group(3)}"
+    return h
 
 
 def merchant_lines(text: str) -> list[str]:
@@ -91,7 +118,7 @@ def match_section(text: str, question: str) -> tuple[str, str, int]:
 
 # Common words that say nothing about the topic, so "see" alone doesn't match "see who changed what".
 FILLER = {"see", "try", "tri", "trying", "tryinh", "want", "need", "know", "like", "help", "way", "use", "work",
-          "doesnt", "cant", "wont", "isnt", "store", "storely", "page", "thing", "something", "anything"}
+          "doesnt", "cant", "still", "wont", "isnt", "store", "storely", "page", "thing", "something", "anything"}
 
 
 def best_section(text: str, question: str) -> str:

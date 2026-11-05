@@ -28,9 +28,14 @@ ASK_FOR_PERSON = re.compile(
 PUSH_BACK = re.compile(
     r"^\W*(no\b|nope|don'?t|do not|didn'?t|did not|doesn'?t|does not|that'?s not|not what|wrong|"
     r"i don'?t want|i do not want|still (not|doesn'?t|can'?t|isn'?t))", re.IGNORECASE)
+NONE_OF_THESE = re.compile(r"\W*(no|nope|none|neither|nothing|other|something else|still no|no\W+none of (the above|"
+                           r"these|them)|none of (the above|these|them)|not (that|those|these|really))\W*",
+                           re.IGNORECASE)
 FOLLOW_UPS_BEFORE_OFFER = 3
 SHORT_MESSAGE_WORDS = 4  # fewer search words than this is too vague to hand off on
 MAX_CLARIFYING_QUESTIONS = 2  # ask for more detail at most twice before handing off
+CHOICE_QUESTION = "I would be glad to help. Which of these is closest to your problem?"
+CHOICE_FOOTER = "You can reply with the number, or describe the problem in your own words."
 CLARIFY_FALLBACK = ("I would like to help with this. Could you tell me a little more about what is happening, for "
                     "example what you were trying to do and any message you see?")
 MAX_COST_PER_CHAT = 0.10
@@ -98,6 +103,8 @@ class ChatSession:
     note_for_agent: str = ""
     answers_given: int = 0
     questions_asked: int = 0  # clarifying questions the assistant asked
+    options: list[str] = field(default_factory=list)  # the choices in the last clarifying question
+    picked: str = ""  # the choice the merchant picked by number in their latest message
     cost_usd: float = 0.0
     ticket_id: str = ""
 
@@ -143,6 +150,12 @@ class ChatAgent:
         if not session.is_open or not text.strip():
             return
         pushed_back = session.awaiting_feedback and bool(PUSH_BACK.search(text))
+        after_question = bool(session.messages) and session.messages[-1].role == "assistant" and \
+            session.questions_asked > 0 and not session.awaiting_feedback
+        choice = re.fullmatch(r"\W*(\d)\W*", text)
+        session.picked = ""
+        if after_question and choice and 1 <= int(choice.group(1)) <= len(session.options):
+            session.picked = session.options[int(choice.group(1)) - 1]  # "2" means the second choice
         session.messages.append(Message("merchant", text.strip()))
 
         if ASK_FOR_PERSON.search(text):
@@ -151,6 +164,15 @@ class ChatAgent:
         if pushed_back:
             self._triage(session)
             return self.hand_off(session, "pushed_back")
+        if after_question and NONE_OF_THESE.fullmatch(text.strip()):
+            # "none of the above": ask once in open words, then hand off. No AI call needed.
+            if session.questions_asked < MAX_CLARIFYING_QUESTIONS:
+                session.questions_asked += 1
+                session.messages.append(Message("assistant", CLARIFY_FALLBACK))
+                return
+            self._triage(session)
+            session.note_for_agent = "The merchant's problem didn't match the help-center cases offered."
+            return self.hand_off(session, "not_covered")
         if session.cost_usd >= self.max_cost:
             return self.hand_off(session, "error")
 
@@ -166,14 +188,15 @@ class ChatAgent:
         session.cost_usd += outcome.cost_usd
         if not outcome.result.answered:
             session.note_for_agent = outcome.result.missing or outcome.note
-            needs_detail = getattr(outcome.result, "needs_detail", False) or len(tokens(text)) < SHORT_MESSAGE_WORDS
+            r = outcome.result
+            needs_detail = getattr(r, "needs_detail", False) or len(tokens(text)) < SHORT_MESSAGE_WORDS
             if needs_detail and session.questions_asked < MAX_CLARIFYING_QUESTIONS and not session.answers_given:
-                # A vague message ("cant log in") gets a question, not a hand-off: the AI's own, or a general one.
-                question = outcome.result.reply.strip() if getattr(outcome.result, "needs_detail", False) else ""
+                # A vague message ("cant log in") gets a question, not a hand-off.
+                options = list(getattr(r, "options", []))
+                if len(options) < 2 and getattr(outcome, "searched", None):
+                    options = cases_from_article(outcome.searched[0], text)  # the AI gave no choices
+                session.messages.append(Message("assistant", self._clarifying_question(session, options)))
                 session.questions_asked += 1
-                question = format_chat_reply(_drop_greeting(question))
-                session.messages.append(Message("assistant", question if "?" in question
-                                                else CLARIFY_FALLBACK))
                 return
             return self.hand_off(session, "not_covered")
 
@@ -218,6 +241,16 @@ class ChatAgent:
         return True
 
     @staticmethod
+    def _clarifying_question(session: ChatSession, options: list[str]) -> str:
+        """First question: numbered choices, so the merchant can just pick one. Second question: an open one."""
+        options = [o.strip().rstrip(".") for o in options if o.strip()][:4]
+        if session.questions_asked == 0 and len(options) >= 2:
+            session.options = options
+            lines = "\n".join(f"{i}. {o}" for i, o in enumerate(options, 1))
+            return f"{CHOICE_QUESTION}\n\n{lines}\n\n{CHOICE_FOOTER}"
+        return CLARIFY_FALLBACK
+
+    @staticmethod
     def _repeats_last_answer(session: ChatSession, reply: str) -> bool:
         # Sending the same steps again never helps: it usually means the merchant pushed back on them.
         last = next((m for m in reversed(session.messages) if m.answered), None)
@@ -230,6 +263,8 @@ class ChatAgent:
         # Search on the latest message. A short follow-up ("and for Canada?") also uses the message before it.
         # Right after a clarifying question, the whole conversation so far is one question.
         texts = session.merchant_texts()
+        if session.picked:
+            texts = texts[:-1] + [session.picked]
         if session.questions_asked and not session.answers_given:
             return " ".join(texts)
         if len(texts) > 1 and len(texts[-1].split()) < 5:
@@ -243,6 +278,12 @@ class ChatAgent:
         ticket.body = ("Conversation so far:\n\n" + session.transcript() +
                        "\n\nAnswer the merchant's latest message.")
         return ticket
+
+
+def cases_from_article(article: Article, question: str) -> list[str]:
+    """The likely cases from the best article's sections, such as "I forgot my password"."""
+    from src.answer.fake_client import likely_cases
+    return likely_cases(f'<article id="{article.article_id}" title="{article.title}">\n{article.body}</article>', question)
 
 
 def _drop_greeting(text: str) -> str:
