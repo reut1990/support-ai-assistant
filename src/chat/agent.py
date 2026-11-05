@@ -1,15 +1,17 @@
 """The support chat's logic: answer from the help articles, or hand the conversation to a person.
 
 Each merchant message goes through these checks, in order:
-1. Did the merchant ask for a person? (plain code, free)
+1. Did the merchant ask for a person, or reject the answer they were just given? (plain code)
 2. Is it urgent, such as a hacked account or a store that is down? (AI triage of the merchant's words only)
 3. Do the help articles answer it? (search, then AI answer)
+4. Is the answer new? Sending the same steps twice means they didn't help, so a person takes over.
 Every chat ends as a ticket: closed when the AI solved it, new when it was handed to a person.
 """
 
 import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from difflib import SequenceMatcher
 
 from src.answer.engine import Answerer, AnswerError
 from src.chat.formatting import format_chat_reply
@@ -19,8 +21,13 @@ from src.triage.engine import Triager, TriageError
 ASK_FOR_PERSON = re.compile(
     r"\b(human|real person|a person|an agent|live agent|representative|manager|"
     r"(talk|speak|chat) (to|with) (someone|somebody|a|an|your|support))\b", re.IGNORECASE)
+# The merchant rejects the answer they were just given: "dont lock anything", "no, that didn't work".
+PUSH_BACK = re.compile(
+    r"^\W*(no\b|nope|don'?t|do not|didn'?t|did not|doesn'?t|does not|that'?s not|not what|wrong|"
+    r"i don'?t want|i do not want|still (not|doesn'?t|can'?t|isn'?t))", re.IGNORECASE)
 FOLLOW_UPS_BEFORE_OFFER = 3
 MAX_COST_PER_CHAT = 0.10
+REPEAT_SIMILARITY = 0.8  # a new answer this close to the previous one is a repeat
 
 RESOLVED = "resolved by AI"
 HANDED_OFF = "handed to a person"
@@ -34,6 +41,10 @@ HANDOFF_MESSAGES = {
                    "a specialist on our team. They will follow up with you by email at {email}.",
     "not_solved": "I am sorry this didn't solve your problem. I have passed your conversation to a specialist on our "
                   "team, who will follow up with you by email at {email}.",
+    "pushed_back": "I understand. I have passed your conversation to a specialist on our team, who can look at your "
+                   "situation and will follow up with you by email at {email}.",
+    "repeat": "I don't want to send you the same steps again, so I have passed your conversation to a specialist on "
+              "our team, who will follow up with you by email at {email}.",
     "error": "I am having trouble answering right now, so I have passed your conversation to a specialist on our "
              "team. They will follow up with you by email at {email}.",
 }
@@ -42,6 +53,8 @@ HANDOFF_REASONS = {
     "urgent": "Urgent (for example a hacked account or a store that is down): handed off without an AI answer.",
     "not_covered": "The help articles don't cover the question.",
     "not_solved": "The merchant said the AI's answer didn't solve the problem.",
+    "pushed_back": "The merchant rejected the AI's answer, so a person should take over.",
+    "repeat": "The merchant's follow-up got the same answer as before, so a person should take over.",
     "error": "The AI couldn't answer (error or spending limit), so the chat was handed off.",
 }
 
@@ -121,11 +134,15 @@ class ChatAgent:
         """Takes one merchant message and adds the assistant's response to the session."""
         if not session.is_open or not text.strip():
             return
+        pushed_back = session.awaiting_feedback and bool(PUSH_BACK.search(text))
         session.messages.append(Message("merchant", text.strip()))
 
         if ASK_FOR_PERSON.search(text):
             self._triage(session)
             return self.hand_off(session, "asked")
+        if pushed_back:
+            self._triage(session)
+            return self.hand_off(session, "pushed_back")
         if session.cost_usd >= self.max_cost:
             return self.hand_off(session, "error")
 
@@ -146,6 +163,9 @@ class ChatAgent:
         reply = outcome.result.reply.strip()
         if session.answers_given and reply.lower().startswith("hello"):
             reply = reply.split("\n", 1)[-1].strip()  # greet only once per chat
+        if self._repeats_last_answer(session, reply):
+            session.note_for_agent = outcome.result.missing or "The merchant pushed back on the AI's answer."
+            return self.hand_off(session, "repeat")
         if outcome.result.missing:
             session.note_for_agent = outcome.result.missing
         session.answers_given += 1
@@ -181,6 +201,15 @@ class ChatAgent:
         session.cost_usd += outcome.cost_usd
         session.triage = outcome.as_columns()
         return True
+
+    @staticmethod
+    def _repeats_last_answer(session: ChatSession, reply: str) -> bool:
+        # Sending the same steps again never helps: it usually means the merchant pushed back on them.
+        last = next((m for m in reversed(session.messages) if m.answered), None)
+        if not last:
+            return False
+        body = lambda t: t.split("\n", 1)[-1].lower()  # ignore the opening line, which often changes
+        return SequenceMatcher(None, body(last.text), body(format_chat_reply(reply))).ratio() >= REPEAT_SIMILARITY
 
     def _search_text(self, session: ChatSession) -> str:
         # Search on the latest message. A short follow-up ("and for Canada?") also uses the message before it.

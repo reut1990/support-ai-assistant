@@ -148,8 +148,9 @@ def test_assistant_words_do_not_make_the_chat_urgent():
     agent, _ = make_agent()
     s = new_session()
     agent.handle(s, "i can't login to my store")
-    agent.handle(s, "dont lock my account")
     assert s.is_open and s.messages[-1].answered
+    agent.handle(s, "what if I forgot my email too")
+    assert s.triage["ai_urgency"] != "urgent"
 
 
 def test_angry_merchant_still_gets_an_answer_and_can_ask_for_a_person():
@@ -168,3 +169,32 @@ def test_chat_reply_layout():
     assert text == ("Hello Reut,\n\nTo regain access:\n\n1. Use **Forgot password**.\n"
                     "2. Use the **Can't access your account?** form.\n\nThese requests are handled first.")
     assert format_chat_reply("Prices from $0 to $49.99 apply.") == "Prices from $0 to $49.99 apply."
+
+
+
+def test_push_back_hands_off_instead_of_repeating():
+    # Reut's test: "dont lock anything" after the hacked-account steps got the same steps again.
+    agent, tickets = make_agent()
+    s = new_session()
+    agent.handle(s, "Someone changed my login password, how do I secure my account?")
+    assert s.messages[-1].answered
+    agent.handle(s, "dont lock anything")
+    assert s.status == "handed_off" and s.messages[-1].text.startswith("I understand.")
+    assert sum(m.answered for m in s.messages) == 1 and tickets.saved[-1][1] is False
+
+
+def test_same_answer_twice_hands_off():
+    agent, _ = make_agent()
+    s = new_session()
+    agent.handle(s, "How do I set up free shipping over $50?")
+    first = s.messages[-1].text
+    agent.answerer.answer = lambda *a, **k: _same(first, k)
+    agent.handle(s, "ok and then?")
+    assert s.status == "handed_off" and "same steps" in s.messages[-1].text
+
+
+def _same(text, _):
+    from types import SimpleNamespace
+    from src.answer.schema import DraftReply
+    return SimpleNamespace(result=DraftReply(answered=True, cited_articles=[], reply=text, missing=""),
+                           sources=[], cost_usd=0.0, note="")

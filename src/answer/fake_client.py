@@ -26,10 +26,12 @@ def fake_reply(text: str, chat: bool = False) -> DraftReply:
         if not articles or any(w in latest for w in NOT_COVERED):
             return DraftReply(answered=False, cited_articles=[], reply="I will connect you with a specialist.",
                               missing="The fake AI found a topic the help center doesn't cover.")
-        greeting = f"Hello {first},\n\n" if "this is your first reply" in ticket_text else ""
+        if "this is your first reply" in ticket_text:
+            intro = f"Hello {first},\n\nHere is how to resolve this."
+        else:
+            intro = "Here is what our help article says about this."
         return DraftReply(answered=True, cited_articles=[articles[0][0]], missing="",
-                          reply=f"{greeting}Here is how to resolve your {short_topic(topic)} question.\n\n"
-                                f"{best_section(text, topic)}")
+                          reply=f"{intro}\n\n{best_section(text, topic)}")
     if not articles or any(w in ticket_text for w in NOT_COVERED):
         return DraftReply(answered=False, cited_articles=[],
                           reply=f"{opening}\n\nI have forwarded your request to a specialist on our team, "
@@ -52,12 +54,6 @@ def best_section(text: str, question: str) -> str:
     best = max(sections, key=lambda p: len(words & set(re.findall(r"[a-z0-9$]{3,}", p.lower()))))
     lines = best.splitlines()[1:]  # drop the heading
     return "\n".join(l for l in lines if l.strip()).strip()
-
-
-def short_topic(text: str) -> str:
-    """A one-word summary of the question, such as "shipping", so the reply doesn't repeat it word for word."""
-    from src.triage.fake_client import fake_triage
-    return fake_triage(text).category
 
 
 class FakeAnswerClient:
