@@ -141,3 +141,20 @@ def test_follow_up_on_a_new_topic_finds_its_own_article():
     agent.handle(s, "How do I add a discount code?")
     assert [a.article_id for a in s.messages[-1].sources] == ["KB-401"]
     assert "fake AI" not in s.messages[-1].text
+
+
+def test_assistant_words_do_not_make_the_chat_urgent():
+    # Reut's test chat: the assistant's own reply said "immediately", which made the follow-up look urgent.
+    agent, _ = make_agent()
+    s = new_session()
+    agent.handle(s, "i can't login to my store")
+    agent.handle(s, "dont lock my account")
+    assert s.is_open and s.messages[-1].answered
+
+
+def test_angry_merchant_still_gets_an_answer_and_can_ask_for_a_person():
+    agent, _ = make_agent()
+    s = new_session()
+    agent.handle(s, "This is unacceptable, how do I add a discount code??")
+    assert s.is_open and s.messages[-1].answered
+    assert s.triage["ai_queue"] == "Priority Escalations"  # still flagged for the ticket

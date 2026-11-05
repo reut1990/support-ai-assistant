@@ -32,7 +32,6 @@ CSS = """
 .sc-header b {font-size: 1.3rem;}
 .sc-header span {opacity: .85; margin-left: 10px;}
 .sc-source {font-size: .85rem; color: #5b6575; margin-top: 6px;}
-.sc-end {border-radius: 8px; padding: 12px 16px; margin-top: 8px;}
 .st-key-solved button {background: #16a34a; border-color: #16a34a; color: #fff;}
 .st-key-solved button:hover {background: #15803d; border-color: #15803d; color: #fff;}
 .st-key-person button {background: #f59e0b; border-color: #f59e0b; color: #1d2430;}
@@ -73,10 +72,6 @@ def sidebar() -> bool:
         session = st.session_state.get("chat")
         if session:
             st.metric("Cost of this chat", f"${session.cost_usd:.4f}")
-            if session.triage:
-                t = session.triage
-                st.caption(f"Triage: {t['ai_category']} · {t['ai_urgency']} · {t['ai_sentiment']} · "
-                           f"churn {t['ai_churn_risk']} → {t['ai_queue']}")
         st.caption(f"Finished chats are saved to: {ticket_store().name}")
         if st.button("Start a new chat"):
             st.session_state.pop("chat", None)
@@ -113,14 +108,26 @@ def show_messages(session: ChatSession) -> None:
 
 
 def show_end(session: ChatSession) -> None:
-    if session.status == "resolved":
-        st.markdown(f'<div class="sc-end" style="background:#dcfce7;color:#16653a"><b>Chat closed, solved by the AI.'
-                    f'</b> Saved as closed ticket {html.escape(session.ticket_id)} for reporting.</div>',
-                    unsafe_allow_html=True)
-    else:
-        st.markdown(f'<div class="sc-end" style="background:#ffedd5;color:#9a4a00"><b>Handed to a person.</b> '
-                    f'New ticket {html.escape(session.ticket_id)} created with the full conversation. '
-                    f'Reason: {html.escape(session.handoff_reason)}</div>', unsafe_allow_html=True)
+    # What the merchant sees. Ticket numbers and handoff reasons are internal, so they stay in the demo panel.
+    st.caption("This chat has ended. You can start a new chat at any time.")
+
+
+def demo_panel(session: ChatSession) -> None:
+    """Behind-the-scenes details for whoever is demoing the project. A real merchant would never see these."""
+    with st.sidebar:
+        st.divider()
+        st.subheader("Behind the scenes")
+        st.caption("Shown for the demo only. Merchants don't see this panel.")
+        if session.triage:
+            t = session.triage
+            st.markdown(f"**Triage:** {t['ai_category']} · {t['ai_urgency']} · {t['ai_sentiment']} · "
+                        f"churn {t['ai_churn_risk']} → {t['ai_queue']}")
+        if session.status == "resolved":
+            st.success(f"Solved by the AI. Saved as closed ticket {session.ticket_id}.")
+        elif session.status == "handed_off":
+            st.warning(f"Handed to a person. New ticket {session.ticket_id}. Reason: {session.handoff_reason}")
+        if session.note_for_agent:
+            st.info(f"Note for the agent: {session.note_for_agent}")
 
 
 def main() -> None:
@@ -136,6 +143,7 @@ def main() -> None:
 
     chat = agent(fake)
     show_messages(session)
+    demo_panel(session)
     if session.awaiting_feedback:
         prompt = ("Did this solve your problem? You can also ask a follow-up question."
                   if not session.offer_person else

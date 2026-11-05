@@ -2,7 +2,7 @@
 
 Each merchant message goes through these checks, in order:
 1. Did the merchant ask for a person? (plain code, free)
-2. Is it urgent, or an angry merchant likely to leave? (AI triage)
+2. Is it urgent, such as a hacked account or a store that is down? (AI triage of the merchant's words only)
 3. Do the help articles answer it? (search, then AI answer)
 Every chat ends as a ticket: closed when the AI solved it, new when it was handed to a person.
 """
@@ -14,7 +14,6 @@ from datetime import datetime, timezone
 from src.answer.engine import Answerer, AnswerError
 from src.models import Article, Ticket
 from src.triage.engine import Triager, TriageError
-from src.triage.routing import ESCALATIONS
 
 ASK_FOR_PERSON = re.compile(
     r"\b(human|real person|a person|an agent|live agent|representative|manager|"
@@ -39,7 +38,7 @@ HANDOFF_MESSAGES = {
 }
 HANDOFF_REASONS = {
     "asked": "The merchant asked for a person.",
-    "urgent": "Urgent, or an angry merchant at high risk of leaving: handed off without an AI answer.",
+    "urgent": "Urgent (for example a hacked account or a store that is down): handed off without an AI answer.",
     "not_covered": "The help articles don't cover the question.",
     "not_solved": "The merchant said the AI's answer didn't solve the problem.",
     "error": "The AI couldn't answer (error or spending limit), so the chat was handed off.",
@@ -55,7 +54,7 @@ class Merchant:
 
     @property
     def first_name(self) -> str:
-        return self.name.split(" ")[0] if self.name else "there"
+        return self.name.split(" ")[0].capitalize() if self.name else "there"
 
 
 @dataclass
@@ -131,7 +130,7 @@ class ChatAgent:
 
         if not self._triage(session):
             return self.hand_off(session, "error")
-        if session.triage.get("ai_urgency") == "urgent" or session.triage.get("ai_queue") == ESCALATIONS:
+        if session.triage.get("ai_urgency") == "urgent":
             return self.hand_off(session, "urgent")
 
         try:
@@ -170,8 +169,12 @@ class ChatAgent:
         session.ticket_id = self.tickets.save(session, closed=False, outcome=f"{HANDED_OFF}: {session.handoff_reason}")
 
     def _triage(self, session: ChatSession) -> bool:
+        # Only the merchant's own words are triaged. The assistant's replies contain words like "immediately"
+        # or "compromised" that would make a calm question look urgent.
+        ticket = session.as_ticket()
+        ticket.body = "\n\n".join(session.merchant_texts())
         try:
-            outcome = self.triager.triage(session.as_ticket())
+            outcome = self.triager.triage(ticket)
         except TriageError:
             return False
         session.cost_usd += outcome.cost_usd

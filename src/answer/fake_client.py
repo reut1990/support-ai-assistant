@@ -14,7 +14,7 @@ NOT_COVERED = ["quickbooks", "instagram", "pre-order", "delivery date", "appeal"
 
 def fake_reply(text: str, chat: bool = False) -> DraftReply:
     name = re.search(r"Merchant: (\S+)", text)
-    first = name.group(1) if name else "there"
+    first = name.group(1).capitalize() if name else "there"
     subject = re.search(r"Subject: (.+)", text)
     topic = subject.group(1).strip().lower() if subject else "your question"
     articles = re.findall(r'<article id="([^"]+)" title="([^"]+)"', text)
