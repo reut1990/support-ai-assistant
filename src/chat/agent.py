@@ -21,8 +21,9 @@ from src.models import Article, Ticket
 from src.triage.engine import Triager, TriageError
 
 ASK_FOR_PERSON = re.compile(
-    r"\b(human|real person|a person|an agent|live agent|representative|manager|"
-    r"(talk|speak|chat) (to|with) (someone|somebody|a|an|your|support))\b", re.IGNORECASE)
+    r"\b(human|real person|a person|person please|an agent|live agent|representative|manager|someone real|"
+    r"(talk|speak|chat) (to|with) (someone|somebody|a|an|your|support)|"
+    r"not (you|a bot|the bot|a robot|ai|an ai)|no (bot|bots|robot|ai)|stop the bot)\b", re.IGNORECASE)
 # The merchant rejects the answer they were just given: "dont lock anything", "no, that didn't work".
 PUSH_BACK = re.compile(
     r"^\W*(no\b|nope|don'?t|do not|didn'?t|did not|doesn'?t|does not|that'?s not|not what|wrong|"
@@ -170,13 +171,13 @@ class ChatAgent:
                 # A vague message ("cant log in") gets a question, not a hand-off: the AI's own, or a general one.
                 question = outcome.result.reply.strip() if getattr(outcome.result, "needs_detail", False) else ""
                 session.questions_asked += 1
-                session.messages.append(Message("assistant", question if question.endswith("?") else CLARIFY_FALLBACK))
+                question = format_chat_reply(_drop_greeting(question))
+                session.messages.append(Message("assistant", question if "?" in question
+                                                else CLARIFY_FALLBACK))
                 return
             return self.hand_off(session, "not_covered")
 
-        reply = outcome.result.reply.strip()
-        if session.answers_given and reply.lower().startswith("hello"):
-            reply = reply.split("\n", 1)[-1].strip()  # greet only once per chat
+        reply = _drop_greeting(outcome.result.reply)
         if self._repeats_last_answer(session, reply):
             session.note_for_agent = outcome.result.missing or "The merchant pushed back on the AI's answer."
             return self.hand_off(session, "repeat")
@@ -240,9 +241,17 @@ class ChatAgent:
         ticket = session.as_ticket()
         ticket.subject = session.merchant_texts()[-1]
         ticket.body = ("Conversation so far:\n\n" + session.transcript() +
-                       "\n\nAnswer the merchant's latest message." + (" This is your first reply."
-                                                                       if not session.answers_given and not session.questions_asked else ""))
+                       "\n\nAnswer the merchant's latest message.")
         return ticket
+
+
+def _drop_greeting(text: str) -> str:
+    # The chat page already says "Hello <name>, welcome", so a reply never greets again.
+    text = text.strip()
+    first, _, rest = text.partition("\n")
+    if re.match(r"^(hello|hi|dear)\b[^.?!\n]{0,40},\s*$", first, re.IGNORECASE) and rest.strip():
+        return rest.strip()
+    return text
 
 
 def ticket_columns(session: ChatSession, outcome: str) -> dict:

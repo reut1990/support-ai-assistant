@@ -69,7 +69,7 @@ def sidebar() -> bool:
         if fake:
             st.caption("Practice mode: nothing is charged.")
         else:
-            st.warning(f"Real AI: about $0.0007 per message. A chat stops itself at ${MAX_COST_PER_CHAT:.2f}.")
+            st.warning(f"Real AI: about \\$0.0007 per message. A chat stops itself at \\${MAX_COST_PER_CHAT:.2f}.")
         session = st.session_state.get("chat")
         if session:
             st.metric("Cost of this chat", f"${session.cost_usd:.4f}")
@@ -163,7 +163,10 @@ def main() -> None:
         return
     text = st.chat_input("Type your message")
     if text:
-        with st.spinner("Thinking..."):
+        # Show the merchant's message straight away, while the assistant works on the answer.
+        with st.chat_message("user", avatar="🧑"):
+            st.markdown(text.replace("$", "\\$"))
+        with st.chat_message("assistant", avatar="🛍️"), st.spinner("Typing..."):
             chat.handle(session, text)
         st.rerun()
 

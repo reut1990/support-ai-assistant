@@ -46,10 +46,10 @@ def test_answers_then_resolves_as_closed_ticket():
     s = new_session()
     agent.handle(s, "How do I set up free shipping over $50?")
     reply = s.messages[-1]
-    assert reply.answered and reply.sources and reply.text.startswith("Hello Maya")
+    assert reply.answered and reply.sources and not reply.text.startswith("Hello")  # the page already greets
     assert s.awaiting_feedback and s.triage["ai_category"] == "shipping"
     agent.handle(s, "And what about local pickup?")
-    assert not s.messages[-1].text.startswith("Hello")  # greets only once
+    assert not s.messages[-1].text.startswith("Hello")
     agent.resolve(s)
     assert s.status == "resolved" and tickets.saved == [(s.chat_id, True, RESOLVED)]
 
@@ -148,9 +148,9 @@ def test_assistant_words_do_not_make_the_chat_urgent():
     # Reut's test chat: the assistant's own reply said "immediately", which made the follow-up look urgent.
     agent, _ = make_agent()
     s = new_session()
-    agent.handle(s, "i can't login to my store admin page")
+    agent.handle(s, "i can't login, my two-step verification codes are not arriving")
     assert s.is_open and s.messages[-1].answered
-    agent.handle(s, "what if I forgot my email too")
+    agent.handle(s, "what if I lost my phone and backup codes")
     assert s.triage["ai_urgency"] != "urgent"
 
 
@@ -206,7 +206,9 @@ def test_vague_message_gets_a_question_before_any_hand_off():
     agent, _ = make_agent()
     s = new_session()
     agent.handle(s, "cant log in")
-    assert s.is_open and s.messages[-1].text.endswith("?") and not s.messages[-1].answered
+    question = s.messages[-1]
+    assert s.is_open and "?" in question.text and not question.answered
+    assert "- Locked out after resetting your password" in question.text  # the likely cases, one per line
     agent.handle(s, "it says my account is locked after I reset my password")
     reply = s.messages[-1]
     assert reply.answered and "30 minutes" in reply.text and not reply.text.startswith("Hello")
@@ -227,3 +229,18 @@ def test_ai_says_not_covered_for_vague_message_still_asks(monkeypatch):
     assert s.is_open  # second question
     agent.handle(s, "still")
     assert s.status == "handed_off"  # after two questions, a person takes over
+
+
+def test_not_you_means_the_merchant_wants_a_person():
+    # Reut's test: "not you" got another AI answer instead of a person.
+    agent, _ = make_agent()
+    s = new_session()
+    agent.handle(s, "i cant log in")
+    agent.handle(s, "not you")
+    assert s.status == "handed_off" and s.handoff_reason.startswith("The merchant asked for a person")
+
+
+def test_replies_never_greet_again():
+    from src.chat.agent import _drop_greeting
+    assert _drop_greeting("Hello vcxv,\n\nCould you tell me more?") == "Could you tell me more?"
+    assert _drop_greeting("Hello, I see.") == "Hello, I see."
