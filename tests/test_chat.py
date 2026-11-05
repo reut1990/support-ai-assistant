@@ -216,17 +216,17 @@ def test_same_answer_twice_hands_off():
     agent, _ = make_agent()
     s = new_session()
     agent.handle(s, "How do I set up free shipping over $50?")
-    first = s.messages[-1].text
-    agent.answerer.answer = lambda *a, **k: _same(first, k)
+    first, sources = s.messages[-1].text, s.messages[-1].sources
+    agent.answerer.answer = lambda *a, **k: _same(first, sources)
     agent.handle(s, "ok and then?")
     assert s.status == "handed_off" and "same steps" in s.messages[-1].text
 
 
-def _same(text, _):
+def _same(text, sources):
     from types import SimpleNamespace
     from src.answer.schema import DraftReply
     return SimpleNamespace(result=DraftReply(answered=True, cited_articles=[], reply=text, missing=""),
-                           sources=[], cost_usd=0.0, note="")
+                           sources=sources, cost_usd=0.0, note="")
 
 
 def test_vague_message_gets_a_question_before_any_hand_off():
@@ -292,3 +292,36 @@ def test_none_of_these_asks_once_more_then_hands_off():
     assert s.is_open and "tell me a bit more" in s.messages[-1].text
     agent.handle(s, "none of the above")
     assert s.status == "handed_off"
+
+
+def test_questions_about_storely_get_the_overview():
+    # Reut's test: "tell me about your products" got choices about the merchant's own products.
+    agent, _ = make_agent()
+    for q in ["tell me about your products", "what do you offer", "what is storely"]:
+        s = new_session()
+        agent.handle(s, q)
+        assert s.messages[-1].answered and s.messages[-1].sources[0].article_id == "KB-001", q
+
+
+def test_invented_facts_are_never_sent():
+    from src.chat.agent import unsupported_facts
+    article = next(a for a in ARTICLES if a.article_id == "KB-102")
+    assert unsupported_facts("Grow is $105 a month. Go to **Settings > Plan > Change plan**.", [article]) == []
+    assert unsupported_facts("Enterprise is $2,000 a month in **Settings > Custom plans**.", [article]) == \
+        ["2,000", "“Settings > Custom plans”"]
+
+
+def test_reply_with_an_invented_price_is_held_back():
+    agent, _ = make_agent()
+    s = new_session()
+    real = agent.answerer.answer
+
+    def invent(*a, **k):
+        outcome = real(*a, **k)
+        outcome.result = outcome.result.model_copy(update={"reply": "Free shipping starts at $35."})
+        return outcome
+
+    agent.answerer.answer = invent
+    agent.handle(s, "How do I set up free shipping over $50?")
+    assert s.awaiting_offer and "accurate information" in s.messages[-1].text
+    assert "35" in s.note_for_agent

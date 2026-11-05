@@ -34,6 +34,10 @@ NONE_OF_THESE = re.compile(r"\W*(no|nope|none|neither|nothing|other|something el
 YES = re.compile(r"\W*(yes|yeah|yep|sure|ok|okay|please|yes please|please do|connect me|go ahead)\W*", re.IGNORECASE)
 NO = re.compile(r"\W*(no|nope|no thanks|no thank you|not now|not yet|no need)\W*", re.IGNORECASE)
 OFFER_QUESTION = "Would you like me to connect you with a specialist on our team who can help with this?"
+# Questions about Storely itself, not about the merchant's own products: "what do you offer", "your services".
+ABOUT_STORELY = re.compile(r"\b(your|you guys'?|storely'?s?) (products|services|features|platform|company)\b|"
+                           r"\bwhat (do|does|can) (you|storely) (offer|do|sell)\b|\babout (you|storely)\b|"
+                           r"\bwhat is storely\b", re.IGNORECASE)
 FOLLOW_UPS_BEFORE_OFFER = 3
 SHORT_MESSAGE_WORDS = 4  # fewer search words than this is too vague to hand off on
 MAX_CLARIFYING_QUESTIONS = 2  # ask for more detail at most twice before handing off
@@ -222,6 +226,12 @@ class ChatAgent:
             return self.offer_person(session, r.reply)
 
         reply = _drop_greeting(outcome.result.reply)
+        unsupported = unsupported_facts(reply, outcome.sources)
+        if unsupported:
+            # Never send a fact the articles don't contain: an invented price or menu name is worse than no answer.
+            session.note_for_agent = ("Answer held back: it mentioned " + ", ".join(unsupported[:5]) +
+                                      ", which the cited articles don't contain.")
+            return self.offer_person(session, "I want to make sure I give you accurate information on this.")
         if self._repeats_last_answer(session, reply):
             session.note_for_agent = outcome.result.missing or "The merchant pushed back on the AI's answer."
             return self.hand_off(session, "repeat")
@@ -302,6 +312,8 @@ class ChatAgent:
         # Search on the latest message. A short follow-up ("and for Canada?") also uses the message before it.
         # Right after a clarifying question, the whole conversation so far is one question.
         texts = session.merchant_texts()
+        if ABOUT_STORELY.search(texts[-1]):
+            return f"{texts[-1]} what Storely offers services plans"  # "tell me about your products" is about us
         if session.picked:
             texts = texts[:-1] + [session.picked]
         if session.questions_asked and not session.answers_given:
@@ -318,6 +330,21 @@ class ChatAgent:
                        "\n\nAnswer the merchant's latest message.\n\nAll help-center topics (for choices when the message is "
                        "broad): " + "; ".join(a.title for a in self.answerer.search.articles))
         return ticket
+
+
+def unsupported_facts(reply: str, sources: list[Article]) -> list[str]:
+    """Numbers, prices, percentages and bold names (buttons, menus, forms) in the reply that none of the cited
+    articles contains. Anything here may be invented, so the reply is not sent."""
+    text = " ".join(f"{a.title} {a.body}" for a in sources).replace("**", "").lower()
+    missing = []
+    body = re.sub(r"^\s*\d+[.)]\s", "", reply, flags=re.M)  # step numbers ("1. Go to") aren't facts
+    for number in re.findall(r"\d[\d,]*(?:\.\d+)?%?", body):
+        if number.rstrip(",") not in text:
+            missing.append(number)
+    for name in re.findall(r"\*\*(.+?)\*\*", reply):
+        if name.lower().strip(" .:") not in text:
+            missing.append(f"“{name}”")
+    return list(dict.fromkeys(missing))
 
 
 def cases_from_article(article: Article, question: str) -> list[str]:

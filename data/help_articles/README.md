@@ -1,11 +1,12 @@
 # Help center articles
 
-15 help-center articles for **Storely**, the fictional store builder used in this project. The AI answers questions using only these articles and cites the one it used.
+16 help-center articles for **Storely**, the fictional store builder used in this project. The AI answers questions using only these articles and cites the one it used.
 
 Topics are inspired by common questions in the public [Shopify Help Center](https://help.shopify.com), but every article, setting name, price and policy here is written from scratch for Storely. Domains such as `storely.example` and the IP address `203.0.113.10` are reserved for documentation and don't point anywhere.
 
 | ID | Article | Category |
 | --- | --- | --- |
+| KB-001 | What Storely offers: our products, services and plans | getting started |
 | KB-101 | Understanding your bill, invoices and unexpected charges | billing |
 | KB-102 | Change, pause or cancel your plan | billing |
 | KB-103 | Transaction fees for third-party payment providers | billing |

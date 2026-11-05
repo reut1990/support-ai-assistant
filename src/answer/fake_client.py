@@ -45,6 +45,13 @@ def fake_chat_reply(text: str, latest: str, articles: list, ticket_text: str) ->
     lines = [numbered.get(l.strip(), l) for l in merchant_lines(text)]  # "2" means the second choice
     question = " ".join(lines) if asked_already else latest
     section, heading, overlap = match_section(text, question)
+    if articles[0][1].startswith("What Storely offers") and not asked_already:
+        # A question about Storely itself: the overview section.
+        overview = _sections(text)[0] if _sections(text) else ""
+        body = "\n".join(l for l in overview.splitlines()[1:] if l.strip())
+        return ChatReply(answered=True, cited_articles=[articles[0][0]], missing="",
+                         reply=f"Here is an overview of what Storely offers:\n\n{body}\n\n"
+                               "Is there anything you'd like to know more about?")
     picked = bool(re.fullmatch(r"\W*\d\W*", latest))  # a numbered choice is clear enough
     if overlap >= 2 or (picked and overlap >= 1):
         return ChatReply(answered=True, cited_articles=[articles[0][0]], missing="",

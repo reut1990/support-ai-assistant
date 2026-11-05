@@ -118,7 +118,7 @@ def test_source_reads_tickets_with_labels_and_writes_results(hubspot):
     assert saved["ai_category"] == "billing" and set(saved) == set(AI_COLUMNS)
     patched = next(t for t in fake.tickets.values() if t["properties"]["storely_ticket_id"] == tickets[0].ticket_id)
     assert patched["properties"]["hs_ticket_priority"] == "MEDIUM"
-    assert len(source.list_articles()) == 15
+    assert len(source.list_articles()) == 16
 
 
 def test_rate_limit_is_retried_and_errors_are_explained(hubspot):

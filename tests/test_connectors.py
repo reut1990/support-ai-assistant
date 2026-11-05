@@ -17,7 +17,7 @@ def test_local_source_reads_sample_data():
     tickets = source.list_tickets()
     articles = source.list_articles()
     assert len(tickets) == 100
-    assert len(articles) == 15
+    assert len(articles) == 16
     assert tickets[0].labels.keys() == {"category", "urgency", "sentiment", "churn_risk"}
     assert all(a.article_id.startswith("KB-") for a in articles)
 
