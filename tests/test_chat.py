@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 
 from src.answer.engine import Answerer
+from src.answer.schema import ChatReply
 from src.answer.fake_client import FakeAnswerClient
 from src.chat.agent import RESOLVED, ChatAgent, ChatSession, Merchant
 from src.chat.prompt import SYSTEM_PROMPT
@@ -32,7 +33,7 @@ class MemoryTickets:
 
 def make_agent(tickets=None):
     tickets = tickets or MemoryTickets()
-    answerer = Answerer(ARTICLES, client=FakeAnswerClient(), system_prompt=SYSTEM_PROMPT)
+    answerer = Answerer(ARTICLES, client=FakeAnswerClient(), system_prompt=SYSTEM_PROMPT, output_format=ChatReply)
     return ChatAgent(Triager(client=FakeClaudeClient()), answerer, tickets), tickets
 
 
@@ -147,7 +148,7 @@ def test_assistant_words_do_not_make_the_chat_urgent():
     # Reut's test chat: the assistant's own reply said "immediately", which made the follow-up look urgent.
     agent, _ = make_agent()
     s = new_session()
-    agent.handle(s, "i can't login to my store")
+    agent.handle(s, "i can't login to my store admin page")
     assert s.is_open and s.messages[-1].answered
     agent.handle(s, "what if I forgot my email too")
     assert s.triage["ai_urgency"] != "urgent"
@@ -198,3 +199,31 @@ def _same(text, _):
     from src.answer.schema import DraftReply
     return SimpleNamespace(result=DraftReply(answered=True, cited_articles=[], reply=text, missing=""),
                            sources=[], cost_usd=0.0, note="")
+
+
+def test_vague_message_gets_a_question_before_any_hand_off():
+    # Reut's test: "cant log in" was handed to a person without even asking what happens.
+    agent, _ = make_agent()
+    s = new_session()
+    agent.handle(s, "cant log in")
+    assert s.is_open and s.messages[-1].text.endswith("?") and not s.messages[-1].answered
+    agent.handle(s, "it says my account is locked after I reset my password")
+    reply = s.messages[-1]
+    assert reply.answered and "30 minutes" in reply.text and not reply.text.startswith("Hello")
+    assert [a.article_id for a in reply.sources] == ["KB-801"]
+
+
+def test_ai_says_not_covered_for_vague_message_still_asks(monkeypatch):
+    from types import SimpleNamespace
+    from src.answer.schema import ChatReply
+    agent, _ = make_agent()
+    no = SimpleNamespace(result=ChatReply(answered=False, cited_articles=[], reply="I will connect you.",
+                                          missing="unclear"), sources=[], cost_usd=0.0, note="")
+    agent.answerer.answer = lambda *a, **k: no
+    s = new_session()
+    agent.handle(s, "cant log in")
+    assert s.is_open and "tell me a little more" in s.messages[-1].text
+    agent.handle(s, "help")
+    assert s.is_open  # second question
+    agent.handle(s, "still")
+    assert s.status == "handed_off"  # after two questions, a person takes over

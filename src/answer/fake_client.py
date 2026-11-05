@@ -7,7 +7,8 @@ center doesn't cover. Its replies are much less precise than the real AI's.
 import re
 from types import SimpleNamespace
 
-from src.answer.schema import DraftReply
+from src.answer.retrieval import tokens
+from src.answer.schema import ChatReply, DraftReply
 
 NOT_COVERED = ["quickbooks", "instagram", "pre-order", "delivery date", "appeal"]
 
@@ -24,14 +25,18 @@ def fake_reply(text: str, chat: bool = False) -> DraftReply:
     if chat:
         latest = ticket_text.split("answer the merchant's latest message")[0]
         if not articles or any(w in latest for w in NOT_COVERED):
-            return DraftReply(answered=False, cited_articles=[], reply="I will connect you with a specialist.",
-                              missing="The fake AI found a topic the help center doesn't cover.")
+            return ChatReply(answered=False, cited_articles=[], reply="I will connect you with a specialist.",
+                             missing="The fake AI found a topic the help center doesn't cover.")
+        if "this is your first reply" in ticket_text and len(tokens(topic)) < 3:
+            return ChatReply(answered=False, needs_detail=True, cited_articles=[], missing="",
+                             reply=f"Hello {first},\n\nI would be glad to help. Could you tell me a little more "
+                                   "about what happens, and any message you see?")
         if "this is your first reply" in ticket_text:
             intro = f"Hello {first},\n\nHere is how to resolve this."
         else:
             intro = "Here is what our help article says about this."
-        return DraftReply(answered=True, cited_articles=[articles[0][0]], missing="",
-                          reply=f"{intro}\n\n{best_section(text, topic)}")
+        return ChatReply(answered=True, cited_articles=[articles[0][0]], missing="",
+                         reply=f"{intro}\n\n{best_section(text, topic)}")
     if not articles or any(w in ticket_text for w in NOT_COVERED):
         return DraftReply(answered=False, cited_articles=[],
                           reply=f"{opening}\n\nI have forwarded your request to a specialist on our team, "
@@ -47,11 +52,12 @@ def best_section(text: str, question: str) -> str:
     body = re.search(r'<article id="[^"]+" title="[^"]+">\n(.*?)</article>', text, re.S)
     if not body:
         return ""
-    words = set(re.findall(r"[a-z0-9$]{3,}", question.lower()))
+    words = set(tokens(question))
     sections = [p.strip() for p in re.split(r"^#{2,3} ", body.group(1), flags=re.M)[1:] if p.strip()]
     if not sections:
         return body.group(1).strip()
-    best = max(sections, key=lambda p: len(words & set(re.findall(r"[a-z0-9$]{3,}", p.lower()))))
+    # Words in a section's heading count twice, because the heading says what the section is about.
+    best = max(sections, key=lambda p: len(words & set(tokens(p))) + len(words & set(tokens(p.splitlines()[0]))))
     lines = best.splitlines()[1:]  # drop the heading
     return "\n".join(l for l in lines if l.strip()).strip()
 

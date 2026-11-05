@@ -9,3 +9,9 @@ class DraftReply(BaseModel):
     cited_articles: list[str] = Field(description="IDs of the articles the reply is based on, such as KB-201. Empty if not answered.")
     missing: str = Field(description="A private note for the agent, never shown to the merchant: what information is "
                                      "missing, or what the agent should check before sending. Empty if nothing.")
+
+
+class ChatReply(DraftReply):
+    needs_detail: bool = Field(default=False, description=(
+        "Chat only. True when the latest message is too short or vague to know which help applies. Then reply is "
+        "one short clarifying question, answered is false and cited_articles is empty."))

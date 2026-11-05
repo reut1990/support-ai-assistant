@@ -41,7 +41,7 @@ class AnswerOutcome:
 
 class Answerer:
     def __init__(self, articles: list[Article], client=None, model: str = DEFAULT_MODEL, effort: str = "low",
-                 system_prompt: str = SYSTEM_PROMPT):
+                 system_prompt: str = SYSTEM_PROMPT, output_format: type[DraftReply] = DraftReply):
         if model not in PRICES:
             raise ValueError(f"No price known for {model}. Add it to src/triage/cost.py first.")
         if client is None:
@@ -52,6 +52,7 @@ class Answerer:
         self.model = model
         self.effort = effort
         self.system_prompt = system_prompt
+        self.output_format = output_format  # the chat uses ChatReply, which can ask a clarifying question
 
     def find_articles(self, ticket: Ticket) -> list[Article]:
         return self.search.search(f"{ticket.subject} {ticket.body}", top=ARTICLES_PER_TICKET)
@@ -70,7 +71,7 @@ class Answerer:
                 system=self.system_prompt,
                 messages=[{"role": "user", "content": answer_message(ticket, articles)}],
                 output_config={"effort": self.effort},
-                output_format=DraftReply,
+                output_format=self.output_format,
             )
         except pydantic.ValidationError as e:
             raise AnswerError(f"{ticket.ticket_id}: no valid answer from the model.") from e

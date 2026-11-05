@@ -3,7 +3,8 @@
 Each merchant message goes through these checks, in order:
 1. Did the merchant ask for a person, or reject the answer they were just given? (plain code)
 2. Is it urgent, such as a hacked account or a store that is down? (AI triage of the merchant's words only)
-3. Do the help articles answer it? (search, then AI answer)
+3. Do the help articles answer it? (search, then AI answer). If not, or the message is too vague, ask for more
+   detail (up to twice) before handing off.
 4. Is the answer new? Sending the same steps twice means they didn't help, so a person takes over.
 Every chat ends as a ticket: closed when the AI solved it, new when it was handed to a person.
 """
@@ -14,6 +15,7 @@ from datetime import datetime, timezone
 from difflib import SequenceMatcher
 
 from src.answer.engine import Answerer, AnswerError
+from src.answer.retrieval import tokens
 from src.chat.formatting import format_chat_reply
 from src.models import Article, Ticket
 from src.triage.engine import Triager, TriageError
@@ -26,6 +28,10 @@ PUSH_BACK = re.compile(
     r"^\W*(no\b|nope|don'?t|do not|didn'?t|did not|doesn'?t|does not|that'?s not|not what|wrong|"
     r"i don'?t want|i do not want|still (not|doesn'?t|can'?t|isn'?t))", re.IGNORECASE)
 FOLLOW_UPS_BEFORE_OFFER = 3
+SHORT_MESSAGE_WORDS = 4  # fewer search words than this is too vague to hand off on
+MAX_CLARIFYING_QUESTIONS = 2  # ask for more detail at most twice before handing off
+CLARIFY_FALLBACK = ("I would like to help with this. Could you tell me a little more about what is happening, for "
+                    "example what you were trying to do and any message you see?")
 MAX_COST_PER_CHAT = 0.10
 REPEAT_SIMILARITY = 0.8  # a new answer this close to the previous one is a repeat
 
@@ -90,6 +96,7 @@ class ChatSession:
     handoff_reason: str = ""
     note_for_agent: str = ""
     answers_given: int = 0
+    questions_asked: int = 0  # clarifying questions the assistant asked
     cost_usd: float = 0.0
     ticket_id: str = ""
 
@@ -158,6 +165,13 @@ class ChatAgent:
         session.cost_usd += outcome.cost_usd
         if not outcome.result.answered:
             session.note_for_agent = outcome.result.missing or outcome.note
+            needs_detail = getattr(outcome.result, "needs_detail", False) or len(tokens(text)) < SHORT_MESSAGE_WORDS
+            if needs_detail and session.questions_asked < MAX_CLARIFYING_QUESTIONS and not session.answers_given:
+                # A vague message ("cant log in") gets a question, not a hand-off: the AI's own, or a general one.
+                question = outcome.result.reply.strip() if getattr(outcome.result, "needs_detail", False) else ""
+                session.questions_asked += 1
+                session.messages.append(Message("assistant", question if question.endswith("?") else CLARIFY_FALLBACK))
+                return
             return self.hand_off(session, "not_covered")
 
         reply = outcome.result.reply.strip()
@@ -213,7 +227,10 @@ class ChatAgent:
 
     def _search_text(self, session: ChatSession) -> str:
         # Search on the latest message. A short follow-up ("and for Canada?") also uses the message before it.
+        # Right after a clarifying question, the whole conversation so far is one question.
         texts = session.merchant_texts()
+        if session.questions_asked and not session.answers_given:
+            return " ".join(texts)
         if len(texts) > 1 and len(texts[-1].split()) < 5:
             return f"{texts[-2]} {texts[-1]}"
         return texts[-1]
@@ -224,7 +241,7 @@ class ChatAgent:
         ticket.subject = session.merchant_texts()[-1]
         ticket.body = ("Conversation so far:\n\n" + session.transcript() +
                        "\n\nAnswer the merchant's latest message." + (" This is your first reply."
-                                                                       if not session.answers_given else ""))
+                                                                       if not session.answers_given and not session.questions_asked else ""))
         return ticket
 
 

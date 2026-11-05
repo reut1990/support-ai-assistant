@@ -16,6 +16,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # so "src" can be 
 import streamlit as st
 
 from src.answer.engine import Answerer
+from src.answer.schema import ChatReply
 from src.answer.fake_client import FakeAnswerClient
 from src.chat.agent import MAX_COST_PER_CHAT, ChatAgent, ChatSession, Merchant
 from src.chat.prompt import SYSTEM_PROMPT
@@ -53,10 +54,10 @@ def ticket_store():
 def agent(fake: bool) -> ChatAgent:
     if fake:
         triager = Triager(client=FakeClaudeClient())
-        answerer = Answerer(articles(), client=FakeAnswerClient(), system_prompt=SYSTEM_PROMPT)
+        answerer = Answerer(articles(), client=FakeAnswerClient(), system_prompt=SYSTEM_PROMPT, output_format=ChatReply)
     else:
         triager = Triager()
-        answerer = Answerer(articles(), system_prompt=SYSTEM_PROMPT)
+        answerer = Answerer(articles(), system_prompt=SYSTEM_PROMPT, output_format=ChatReply)
     return ChatAgent(triager, answerer, ticket_store())
 
 
