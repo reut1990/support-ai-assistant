@@ -100,7 +100,8 @@ def show_messages(session: ChatSession) -> None:
     for m in session.messages:
         with st.chat_message("user" if m.role == "merchant" else "assistant",
                              avatar="🧑" if m.role == "merchant" else "🛍️"):
-            st.markdown(m.text.replace("\n", "  \n"))
+            # Replies are laid out by src/chat/formatting.py. "$" is escaped so "$0 to $50" isn't read as math.
+            st.markdown(m.text.replace("$", "\\$"))
             if m.sources:
                 titles = ", ".join(f"“{html.escape(a.title)}”" for a in m.sources)
                 st.markdown(f'<div class="sc-source">For more details, see our help article {titles}.</div>',

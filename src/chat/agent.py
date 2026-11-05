@@ -12,6 +12,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
 from src.answer.engine import Answerer, AnswerError
+from src.chat.formatting import format_chat_reply
 from src.models import Article, Ticket
 from src.triage.engine import Triager, TriageError
 
@@ -148,7 +149,7 @@ class ChatAgent:
         if outcome.result.missing:
             session.note_for_agent = outcome.result.missing
         session.answers_given += 1
-        session.messages.append(Message("assistant", reply, outcome.sources, answered=True))
+        session.messages.append(Message("assistant", format_chat_reply(reply), outcome.sources, answered=True))
 
     def resolve(self, session: ChatSession) -> None:
         """The merchant said the answer solved the problem."""

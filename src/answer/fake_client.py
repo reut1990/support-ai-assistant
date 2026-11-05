@@ -51,7 +51,7 @@ def best_section(text: str, question: str) -> str:
         return body.group(1).strip()
     best = max(sections, key=lambda p: len(words & set(re.findall(r"[a-z0-9$]{3,}", p.lower()))))
     lines = best.splitlines()[1:]  # drop the heading
-    return "\n".join(l for l in lines if l.strip()).replace("**", "").strip()
+    return "\n".join(l for l in lines if l.strip()).strip()
 
 
 def short_topic(text: str) -> str:

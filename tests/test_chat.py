@@ -158,3 +158,13 @@ def test_angry_merchant_still_gets_an_answer_and_can_ask_for_a_person():
     agent.handle(s, "This is unacceptable, how do I add a discount code??")
     assert s.is_open and s.messages[-1].answered
     assert s.triage["ai_queue"] == "Priority Escalations"  # still flagged for the ticket
+
+
+def test_chat_reply_layout():
+    from src.chat.formatting import format_chat_reply
+
+    text = format_chat_reply("Hello Reut,\nTo regain access: 1. Use **Forgot password**. 2. Use the "
+                             "**Can't access your account?** form.\nThese requests are handled first.")
+    assert text == ("Hello Reut,\n\nTo regain access:\n\n1. Use **Forgot password**.\n"
+                    "2. Use the **Can't access your account?** form.\n\nThese requests are handled first.")
+    assert format_chat_reply("Prices from $0 to $49.99 apply.") == "Prices from $0 to $49.99 apply."
