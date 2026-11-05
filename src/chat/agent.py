@@ -1,11 +1,13 @@
 """The support chat's logic: answer from the help articles, or hand the conversation to a person.
 
-Each merchant message goes through these checks, in order:
-1. Did the merchant ask for a person, or reject the answer they were just given? (plain code)
-2. Is it urgent, such as a hacked account or a store that is down? (AI triage of the merchant's words only)
-3. Do the help articles answer it? (search, then AI answer). If not, or the message is too vague, ask for more
-   detail (up to twice) before handing off.
-4. Is the answer new? Sending the same steps twice means they didn't help, so a person takes over.
+The full flow, step by step, is in docs/chat-logic.md. In short, each merchant message is checked in this order:
+1. Plain-code checks (free): an answer to our offer of a specialist, a request for a person, rejecting the last
+   answer, "none of these", the spending limit.
+2. AI triage of the merchant's words only: urgent chats go straight to a person.
+3. Search the help articles and let the AI answer. A vague message gets numbered choices; a topic the articles
+   don't cover gets an offer of a specialist.
+4. Checks on the answer: every price, number and bold name must be in the articles, and it must not repeat the
+   last answer.
 Every chat ends as a ticket: closed when the AI solved it, new when it was handed to a person.
 """
 

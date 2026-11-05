@@ -122,15 +122,18 @@ To read tickets and articles from Google Drive instead, follow [docs/setup-googl
 python -m streamlit run app/support_chat.py
 ```
 
-A chat page for merchants. Each message goes through three checks, in order:
+A chat page for merchants. Each message goes through a fixed set of checks, most of them plain code:
 
-1. **Asked for a person?** Plain code looks for phrases such as "talk to someone" or "human", and hands off right away.
-2. **Urgent?** The triage engine reads the message. Urgent issues, or angry merchants likely to leave, go straight to a person instead of the AI trying to solve them.
-3. **Covered by the help articles?** The search picks the 3 best articles and Claude answers from them only, in a formal chat style with the article named. If they don't cover the question, the chat says so and hands off.
+1. **Asked for a person, or rejected the answer?** Phrases such as "talk to someone", "not you" or "that didn't work" hand off right away.
+2. **Urgent?** The triage engine reads the merchant's words. Urgent issues, such as a hacked account, go straight to a person.
+3. **Covered by the help articles?** The search picks the 3 best articles and Claude answers from them only. A vague message ("cant log in") gets a short question with numbered choices. A topic the articles don't cover gets "I don't have details on that" and an offer to connect a specialist.
+4. **Nothing invented.** Before an answer is shown, code checks that every price, number and button name in it appears in the articles. If not, the answer is held back and a specialist is offered.
+
+The whole flow, with a diagram and the code behind each step, is in [docs/chat-logic.md](docs/chat-logic.md).
 
 After each answer the merchant can click **Yes, that solved it**, **No, talk to a person**, or ask a follow-up. Every chat ends as a ticket: a **Closed** ticket marked "Resolved by AI" (so the share of chats the AI solves can be reported), or a **New** ticket with the full conversation, the AI's triage, the priority and the reason for the handoff, ready on the agent assist screen. With `DATA_SOURCE=hubspot` the tickets are created in HubSpot, linked to the merchant's contact.
 
-The page starts in free practice mode with a fake AI. With the real AI a message costs about $0.0007, and a chat stops itself at $0.10.
+The page starts in free practice mode with a fake AI. With the real AI a message costs about $0.0008, and a chat stops itself at $0.10.
 
 ### Connect HubSpot
 
