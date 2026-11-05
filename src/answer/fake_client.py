@@ -44,7 +44,7 @@ def fake_chat_reply(text: str, latest: str, articles: list, ticket_text: str) ->
     section, heading, overlap = match_section(text, question)
     if overlap >= 2:
         return ChatReply(answered=True, cited_articles=[articles[0][0]], missing="",
-                         reply=f"Here is what our help article says under \u201c{heading}\u201d.\n\n"
+                         reply=("Thank you for the details. " if asked_already else "") + "Here is how to resolve this:\n\n"
                                f"{section}")
     if not asked_already:
         cases = "\n".join(f"- {h}" for h in section_headings(text)[:4])
