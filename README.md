@@ -122,14 +122,43 @@ To read tickets and articles from Google Drive instead, follow [docs/setup-googl
 python -m streamlit run app/support_chat.py
 ```
 
-A chat page for merchants. Each message goes through a fixed set of checks, most of them plain code:
+A chat page for merchants that answers from the help articles only, and connects the merchant with a specialist when it can't help. Most checks are plain code and cost nothing. The AI is used only to triage the message and write the answer.
 
-1. **Asked for a person, or rejected the answer?** Phrases such as "talk to someone", "not you" or "that didn't work" hand off right away.
-2. **Urgent?** The triage engine reads the merchant's words. Urgent issues, such as a hacked account, go straight to a person.
-3. **Covered by the help articles?** The search picks the 3 best articles and Claude answers from them only. A vague message ("cant log in") gets a short question with numbered choices. A topic the articles don't cover gets "I don't have details on that" and an offer to connect a specialist.
-4. **Nothing invented.** Before an answer is shown, code checks that every price, number and button name in it appears in the articles. If not, the answer is held back and a specialist is offered.
+1. **The merchant writes.** If they ask for a person ("human", "not you"), they're connected to a specialist right away.
+2. **If they reject the answer they just got** ("that didn't work"), they're connected to a specialist.
+3. **The AI checks how urgent it is.** Urgent problems, such as a hacked account or a store that is down, go straight to a specialist as a priority.
+4. **The chat searches the help articles** and the AI writes an answer from them only. One of three things happens:
+   - **The articles answer it.** The answer is checked: every price, number and button name must be in the articles. Then it's sent, with **Yes, that solved it** / **No, talk to a person** buttons.
+   - **The message is too vague** ("cant log in"). The chat asks what they mean, with numbered choices. The merchant replies with a number or in their own words, and the chat goes back to step 4.
+   - **The articles don't cover it** ("do you have a custom plan?"). The chat says so and asks: "Would you like me to connect you with a specialist?"
+5. **The merchant answers that offer.** Yes connects them to a specialist. No continues the chat: "No problem. Is there anything else I can help you with?"
+6. **The chat ends** when the merchant clicks "Yes, that solved it" (saved as a closed ticket), or when they're connected to a specialist (saved as a new ticket for the team).
 
-The whole flow, with a diagram and the code behind each step, is in [docs/chat-logic.md](docs/chat-logic.md).
+**Nothing invented:** before an answer is shown, code checks that every price, number and button name in it appears in the help articles. If not, the answer is held back and a specialist is offered.
+
+```mermaid
+flowchart TD
+    M[Merchant writes] --> B{Asks for a person or rejects the answer?}
+    B -- yes --> H[Connect to a specialist]
+    B -- no --> G{Urgent?}
+    G -- yes --> H
+    G -- no --> S[Search the articles and the AI answers]
+    S --> I{Result}
+    I -- answered --> J{Facts all in the articles?}
+    J -- yes --> R[Send the answer and ask if it solved it]
+    J -- no --> O[Offer a specialist]
+    I -- too vague --> Q[Ask with numbered choices]
+    Q --> M
+    I -- not covered --> O
+    O -- yes --> H
+    O -- no --> N[Anything else I can help with?]
+    N --> M
+    R -- solved --> C[Closed ticket]
+    R -- follow-up --> M
+    H --> T[New ticket for the team]
+```
+
+Every check, with the code behind it, is in [docs/chat-logic.md](docs/chat-logic.md).
 
 After each answer the merchant can click **Yes, that solved it**, **No, talk to a person**, or ask a follow-up. Every chat ends as a ticket: a **Closed** ticket marked "Resolved by AI" (so the share of chats the AI solves can be reported), or a **New** ticket with the full conversation, the AI's triage, the priority and the reason for the handoff, ready on the agent assist screen. With `DATA_SOURCE=hubspot` the tickets are created in HubSpot, linked to the merchant's contact.
 
