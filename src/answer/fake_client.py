@@ -45,21 +45,38 @@ def fake_chat_reply(text: str, latest: str, articles: list, ticket_text: str) ->
     lines = [numbered.get(l.strip(), l) for l in merchant_lines(text)]  # "2" means the second choice
     question = " ".join(lines) if asked_already else latest
     section, heading, overlap = match_section(text, question)
-    if overlap >= 2:
+    picked = bool(re.fullmatch(r"\W*\d\W*", latest))  # a numbered choice is clear enough
+    if overlap >= 2 or (picked and overlap >= 1):
         return ChatReply(answered=True, cited_articles=[articles[0][0]], missing="",
                          reply=opening_line(latest, asked_already) + "\n\n"
                                f"{section}")
     if not asked_already:
         return ChatReply(answered=False, needs_detail=True, cited_articles=[], missing="",
-                         reply="Happy to help with that. Which of these do you mean?", options=likely_cases(text, latest))
+                         reply="Happy to help with that. Which of these do you mean?", options=broad_or_likely_cases(text, latest))
     return ChatReply(answered=False, cited_articles=[], reply="I will connect you with a specialist.",
                      missing="The fake AI couldn't match the merchant's words to a help-article section.")
 
 
 def opening_line(latest: str, asked_already: bool) -> str:
     if re.fullmatch(r"\W*\d\W*", latest):
-        return "Sure. Here is how to do that:"  # the merchant picked a numbered choice
+        return "Sure. Here is what you need to know:"  # the merchant picked a numbered choice
     return "Thank you, that helps. Here is what to do:" if asked_already else "Here is how to resolve this:"
+
+
+# The most common help-center topics, offered when a question is too broad for one article.
+BROAD_TOPICS = ["I want to know about plans and pricing", "I need help with shipping",
+                "I have a question about payouts", "I want to change how my store looks"]
+
+
+def broad_or_likely_cases(text: str, question: str) -> list[str]:
+    """A broad question ("tell me about your services") gets the most common topics; others get article sections."""
+    first_title = re.search(r'<article id="[^"]+" title="([^"]+)"', text)
+    words = set(tokens(question)) - FILLER
+    if words & LOGIN_WORDS:
+        words |= LOGIN_WORDS
+    if first_title and not words & set(tokens(first_title.group(1) + " " + " ".join(section_headings(text)))):
+        return BROAD_TOPICS
+    return likely_cases(text, question)
 
 
 LOGIN_WORDS = {"login", "log", "sign", "signin", "access", "password", "code", "lock"}
@@ -124,7 +141,7 @@ def match_section(text: str, question: str) -> tuple[str, str, int]:
 
 # Common words that say nothing about the topic, so "see" alone doesn't match "see who changed what".
 FILLER = {"see", "try", "tri", "trying", "tryinh", "want", "need", "know", "like", "help", "way", "use", "work",
-          "doesnt", "cant", "still", "wont", "isnt", "store", "storely", "page", "thing", "something", "anything"}
+          "doesnt", "cant", "still", "wont", "isnt", "store", "storely", "page", "tell", "service", "services", "about", "info", "information", "thing", "something", "anything"}
 
 
 def best_section(text: str, question: str) -> str:

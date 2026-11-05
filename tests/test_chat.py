@@ -74,8 +74,23 @@ def test_uncovered_topic_says_i_dont_know():
     agent, _ = make_agent()
     s = new_session()
     agent.handle(s, "Is there a way to sync my orders with QuickBooks?")
-    assert s.status == "handed_off" and "needs a closer look" in s.messages[-1].text
+    assert s.is_open and s.awaiting_offer and "connect you with a specialist" in s.messages[-1].text
     assert s.note_for_agent
+    agent.handle(s, "yes please")
+    assert s.status == "handed_off" and "needs a closer look" in s.messages[-1].text
+
+
+def test_merchant_can_decline_a_specialist_and_keep_chatting():
+    # Reut's test: "do you have a custom plan?" ended the chat straight away.
+    agent, _ = make_agent()
+    s = new_session()
+    agent.handle(s, "How do I set up free shipping over $50?")
+    agent.handle(s, "Can I sync orders with QuickBooks?")
+    assert s.awaiting_offer
+    agent.handle(s, "no thanks")
+    assert s.is_open and s.messages[-1].text.startswith("No problem")
+    agent.handle(s, "How do I add a discount code?")
+    assert s.messages[-1].answered
 
 
 def test_offers_a_person_after_three_answers_and_closed_chat_ignores_messages():
@@ -133,6 +148,19 @@ def test_chat_page_runs_in_practice_mode(tmp_path, monkeypatch):
     assert not at.exception
     at.button(key="solved").click().run()
     assert "Closed" in (tmp_path / "chats.csv").read_text()
+
+
+def test_chat_page_offer_buttons(tmp_path, monkeypatch):
+    from streamlit.testing.v1 import AppTest
+
+    monkeypatch.setattr("src.chat.tickets.chat_tickets", lambda: LocalChatTickets(tmp_path / "chats.csv"))
+    at = AppTest.from_file(APP, default_timeout=30).run()
+    at.text_input[0].set_value("Maya Larsen")
+    at.text_input[1].set_value("maya@example.com")
+    next(b for b in at.button if b.label == "Start chat").click().run()
+    at.chat_input[0].set_value("Can I sync my orders with QuickBooks?").run()
+    at.button(key="decline").click().run()
+    assert not at.exception and "anything else" in at.chat_message[-1].markdown[0].value
 
 
 def test_follow_up_on_a_new_topic_finds_its_own_article():
@@ -228,7 +256,7 @@ def test_ai_says_not_covered_for_vague_message_still_asks(monkeypatch):
     agent.handle(s, "help")
     assert s.is_open  # second question
     agent.handle(s, "still")
-    assert s.status == "handed_off"  # after two questions, a person takes over
+    assert s.awaiting_offer  # after two questions, a person is offered
 
 
 def test_not_you_means_the_merchant_wants_a_person():

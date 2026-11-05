@@ -31,6 +31,9 @@ PUSH_BACK = re.compile(
 NONE_OF_THESE = re.compile(r"\W*(no|nope|none|neither|nothing|other|something else|still no|no\W+none of (the above|"
                            r"these|them)|none of (the above|these|them)|not (that|those|these|really))\W*",
                            re.IGNORECASE)
+YES = re.compile(r"\W*(yes|yeah|yep|sure|ok|okay|please|yes please|please do|connect me|go ahead)\W*", re.IGNORECASE)
+NO = re.compile(r"\W*(no|nope|no thanks|no thank you|not now|not yet|no need)\W*", re.IGNORECASE)
+OFFER_QUESTION = "Would you like me to connect you with a specialist on our team who can help with this?"
 FOLLOW_UPS_BEFORE_OFFER = 3
 SHORT_MESSAGE_WORDS = 4  # fewer search words than this is too vague to hand off on
 MAX_CLARIFYING_QUESTIONS = 2  # ask for more detail at most twice before handing off
@@ -92,6 +95,7 @@ class Message:
     text: str
     sources: list[Article] = field(default_factory=list)
     answered: bool = False  # True when this assistant message answered from the articles
+    offer: bool = False  # True when this assistant message offers to connect the merchant with a person
 
 
 @dataclass
@@ -119,6 +123,10 @@ class ChatSession:
     def offer_person(self) -> bool:
         """After a few answers without the merchant saying it's solved, offer a person more clearly."""
         return self.is_open and self.answers_given >= FOLLOW_UPS_BEFORE_OFFER
+
+    @property
+    def awaiting_offer(self) -> bool:
+        return self.is_open and bool(self.messages) and self.messages[-1].offer
 
     @property
     def awaiting_feedback(self) -> bool:
@@ -159,7 +167,12 @@ class ChatAgent:
         session.picked = ""
         if after_question and choice and 1 <= int(choice.group(1)) <= len(session.options):
             session.picked = session.options[int(choice.group(1)) - 1]  # "2" means the second choice
+        offered = session.awaiting_offer
         session.messages.append(Message("merchant", text.strip()))
+        if offered and YES.fullmatch(text.strip()):
+            return self.hand_off(session, "not_covered")
+        if offered and NO.fullmatch(text.strip()):
+            return self.decline_offer(session, typed=True)
 
         if ASK_FOR_PERSON.search(text):
             self._triage(session)
@@ -192,7 +205,11 @@ class ChatAgent:
         if not outcome.result.answered:
             session.note_for_agent = outcome.result.missing or outcome.note
             r = outcome.result
-            needs_detail = getattr(r, "needs_detail", False) or len(tokens(text)) < SHORT_MESSAGE_WORDS
+            # A short message the AI couldn't place is vague ("cant log in"), unless it names something the help
+            # center never mentions ("QuickBooks"): then it's clear, just not covered.
+            words = tokens(text)
+            unknown = [w for w in words if len(w) >= 5 and w not in self.answerer.search.idf]
+            needs_detail = getattr(r, "needs_detail", False) or (len(words) < SHORT_MESSAGE_WORDS and not unknown)
             if needs_detail and session.questions_asked < MAX_CLARIFYING_QUESTIONS and not session.answers_given:
                 # A vague message ("cant log in") gets a question, not a hand-off.
                 options = list(getattr(r, "options", []))
@@ -202,7 +219,7 @@ class ChatAgent:
                 session.messages.append(Message("assistant", self._clarifying_question(session, options, question)))
                 session.questions_asked += 1
                 return
-            return self.hand_off(session, "not_covered")
+            return self.offer_person(session, r.reply)
 
         reply = _drop_greeting(outcome.result.reply)
         if self._repeats_last_answer(session, reply):
@@ -212,6 +229,19 @@ class ChatAgent:
             session.note_for_agent = outcome.result.missing
         session.answers_given += 1
         session.messages.append(Message("assistant", format_chat_reply(reply), outcome.sources, answered=True))
+
+    def offer_person(self, session: ChatSession, ai_sentence: str = "") -> None:
+        """The articles don't cover it: say so, and ask whether to connect a specialist, as a person would."""
+        sentence = _drop_greeting(ai_sentence)
+        if not sentence or len(sentence) > 250 or re.search(r"connect|specialist|pass", sentence, re.IGNORECASE):
+            sentence = "I'm afraid I don't have the details on that."
+        session.messages.append(Message("assistant", f"{sentence} {OFFER_QUESTION}", offer=True))
+
+    def decline_offer(self, session: ChatSession, typed: bool = False) -> None:
+        """The merchant doesn't want a specialist (yet): carry on with the chat."""
+        if not typed:
+            session.messages.append(Message("merchant", "No, thanks"))
+        session.messages.append(Message("assistant", "No problem. Is there anything else I can help you with?"))
 
     def resolve(self, session: ChatSession) -> None:
         """The merchant said the answer solved the problem."""
@@ -285,7 +315,8 @@ class ChatAgent:
         ticket = session.as_ticket()
         ticket.subject = session.merchant_texts()[-1]
         ticket.body = ("Conversation so far:\n\n" + session.transcript() +
-                       "\n\nAnswer the merchant's latest message.")
+                       "\n\nAnswer the merchant's latest message.\n\nAll help-center topics (for choices when the message is "
+                       "broad): " + "; ".join(a.title for a in self.answerer.search.articles))
         return ticket
 
 

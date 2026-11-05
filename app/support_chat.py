@@ -107,9 +107,10 @@ def show_messages(session: ChatSession) -> None:
             # Replies are laid out by src/chat/formatting.py. "$" is escaped so "$0 to $50" isn't read as math.
             st.markdown(m.text.replace("$", "\\$"))
             if m.sources:
-                titles = ", ".join(f"“{html.escape(a.title)}”" for a in m.sources)
-                st.markdown(f'<div class="sc-source">For more details, see our help article {titles}.</div>',
-                            unsafe_allow_html=True)
+                titles = [f"“{html.escape(a.title)}”" for a in m.sources]
+                line = (f"our help article {titles[0]}" if len(titles) == 1 else
+                        f"our help articles {', '.join(titles[:-1])} and {titles[-1]}")
+                st.markdown(f'<div class="sc-source">For more details, see {line}.</div>', unsafe_allow_html=True)
 
 
 def show_end(session: ChatSession) -> None:
@@ -162,6 +163,14 @@ def main() -> None:
             st.rerun()
         if c2.button("No, talk to a person", key="person", use_container_width=True):
             chat.hand_off(session, "not_solved")
+            st.rerun()
+    if session.awaiting_offer:
+        c1, c2, _ = st.columns([1.3, 1, 1])
+        if c1.button("Yes, connect me", key="person", use_container_width=True):
+            chat.hand_off(session, "not_covered")
+            st.rerun()
+        if c2.button("No, thanks", key="decline", use_container_width=True):
+            chat.decline_offer(session)
             st.rerun()
     if not session.is_open:
         show_end(session)
