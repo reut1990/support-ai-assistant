@@ -34,13 +34,16 @@ NONE_OF_THESE = re.compile(r"\W*(no|nope|none|neither|nothing|other|something el
 YES = re.compile(r"\W*(yes|yeah|yep|sure|ok|okay|please|yes please|please do|connect me|go ahead)\W*", re.IGNORECASE)
 NO = re.compile(r"\W*(no|nope|no thanks|no thank you|not now|not yet|no need)\W*", re.IGNORECASE)
 OFFER_QUESTION = "Would you like me to connect you with a specialist on our team who can help with this?"
+# The merchant drops the last question and asks something new.
+TOPIC_CHANGE = re.compile(r"^\W*(never ?mind|nvm|forget (it|that|about it)|actually|another question|different "
+                          r"question|something else|ok(ay)? (and|so)|anyway)\b\W*", re.IGNORECASE)
 # Questions about Storely itself, not about the merchant's own products: "what do you offer", "your services".
 ABOUT_STORELY = re.compile(r"\b(your|you guys'?|storely'?s?) (products|services|features|platform|company)\b|"
                            r"\bwhat (do|does|can) (you|storely) (offer|do|sell)\b|\babout (you|storely)\b|"
                            r"\bwhat is storely\b", re.IGNORECASE)
 FOLLOW_UPS_BEFORE_OFFER = 3
 SHORT_MESSAGE_WORDS = 4  # fewer search words than this is too vague to hand off on
-MAX_CLARIFYING_QUESTIONS = 2  # ask for more detail at most twice before handing off
+MAX_CLARIFYING_QUESTIONS = 3  # per topic: ask for more detail at most 3 times before offering a person
 CHOICE_QUESTION = "Happy to help with that. Which of these do you mean?"
 CHOICE_FOOTER = "Just reply with the number, or tell me in your own words."
 OPEN_QUESTION = ("Happy to help. Could you tell me a bit more about what you need? For example, what you were "
@@ -116,6 +119,7 @@ class ChatSession:
     questions_asked: int = 0  # clarifying questions the assistant asked
     options: list[str] = field(default_factory=list)  # the choices in the last clarifying question
     picked: str = ""  # the choice the merchant picked by number in their latest message
+    topic_start: int = 0  # index of the merchant message where the current topic started
     cost_usd: float = 0.0
     ticket_id: str = ""
 
@@ -172,6 +176,10 @@ class ChatAgent:
         if after_question and choice and 1 <= int(choice.group(1)) <= len(session.options):
             session.picked = session.options[int(choice.group(1)) - 1]  # "2" means the second choice
         offered = session.awaiting_offer
+        if TOPIC_CHANGE.match(text):
+            # "never mind, I can't log in": a new question, not an answer to the last one.
+            after_question, session.options, session.questions_asked, session.picked = False, [], 0, ""
+            session.topic_start = len(session.merchant_texts())
         session.messages.append(Message("merchant", text.strip()))
         if offered and YES.fullmatch(text.strip()):
             return self.hand_off(session, "not_covered")
@@ -186,7 +194,7 @@ class ChatAgent:
             return self.hand_off(session, "pushed_back")
         if after_question and NONE_OF_THESE.fullmatch(text.strip()):
             # "none of the above": ask once in open words, then hand off. No AI call needed.
-            if session.questions_asked < MAX_CLARIFYING_QUESTIONS:
+            if session.questions_asked < 2:
                 session.questions_asked += 1
                 session.messages.append(Message("assistant", CLARIFY_FALLBACK))
                 return
@@ -214,7 +222,7 @@ class ChatAgent:
             words = tokens(text)
             unknown = [w for w in words if len(w) >= 5 and w not in self.answerer.search.idf]
             needs_detail = getattr(r, "needs_detail", False) or (len(words) < SHORT_MESSAGE_WORDS and not unknown)
-            if needs_detail and session.questions_asked < MAX_CLARIFYING_QUESTIONS and not session.answers_given:
+            if needs_detail and session.questions_asked < MAX_CLARIFYING_QUESTIONS:
                 # A vague message ("cant log in") gets a question, not a hand-off.
                 options = list(getattr(r, "options", []))
                 if len(options) < 2 and getattr(outcome, "searched", None):
@@ -223,6 +231,8 @@ class ChatAgent:
                 session.messages.append(Message("assistant", self._clarifying_question(session, options, question)))
                 session.questions_asked += 1
                 return
+            if needs_detail:  # we asked enough and still couldn't place it: don't claim the articles lack it
+                return self.offer_person(session, "I'm sorry I wasn't able to find the right answer for you here.")
             return self.offer_person(session, r.reply)
 
         reply = _drop_greeting(outcome.result.reply)
@@ -238,6 +248,7 @@ class ChatAgent:
         if outcome.result.missing:
             session.note_for_agent = outcome.result.missing
         session.answers_given += 1
+        session.questions_asked, session.options = 0, []  # the next vague question starts a fresh round
         session.messages.append(Message("assistant", format_chat_reply(reply), outcome.sources, answered=True))
 
     def offer_person(self, session: ChatSession, ai_sentence: str = "") -> None:
@@ -286,18 +297,17 @@ class ChatAgent:
 
     @staticmethod
     def _clarifying_question(session: ChatSession, options: list[str], question: str = "") -> str:
-        """First question: numbered choices, so the merchant can just pick one. Second question: an open one.
+        """Numbered choices when there are some, so the merchant can just pick one, otherwise an open question.
         The AI writes the question in its own words; the code lays out the choices the same way every time."""
         options = [o.strip().rstrip(".") for o in options if o.strip()][:4]
         options = [o for o in options if not o.lower().startswith("something else")]  # the footer says that
-        if session.questions_asked == 0 and len(options) >= 2:
+        question = question.strip() if "?" in question and len(question) < 300 else ""
+        if len(options) >= 2:
             session.options = options
             lines = "\n".join(f"{i}. {o}" for i, o in enumerate(options, 1))
-            question = question.strip() if "?" in question and len(question) < 200 else CHOICE_QUESTION
-            return f"{question}\n\n{lines}\n\n{CHOICE_FOOTER}"
-        if session.questions_asked == 0:
-            return question.strip() if "?" in question and len(question) < 300 else OPEN_QUESTION
-        return CLARIFY_FALLBACK
+            return f"{question or CHOICE_QUESTION}\n\n{lines}\n\n{CHOICE_FOOTER}"
+        session.options = []
+        return question or OPEN_QUESTION
 
     @staticmethod
     def _repeats_last_answer(session: ChatSession, reply: str) -> bool:
@@ -311,13 +321,14 @@ class ChatAgent:
     def _search_text(self, session: ChatSession) -> str:
         # Search on the latest message. A short follow-up ("and for Canada?") also uses the message before it.
         # Right after a clarifying question, the whole conversation so far is one question.
-        texts = session.merchant_texts()
+        texts = session.merchant_texts()[session.topic_start:]  # earlier topics don't help the search
+        texts[-1] = TOPIC_CHANGE.sub("", texts[-1]) or texts[-1]
         if ABOUT_STORELY.search(texts[-1]):
             return f"{texts[-1]} what Storely offers services plans"  # "tell me about your products" is about us
         if session.picked:
             texts = texts[:-1] + [session.picked]
-        if session.questions_asked and not session.answers_given:
-            return " ".join(texts)
+        if session.questions_asked and not session.answers_given and len(texts[-1].split()) < 8:
+            return " ".join(texts)  # a short answer to our question needs the question it answers
         if len(texts) > 1 and len(texts[-1].split()) < 5:
             return f"{texts[-2]} {texts[-1]}"
         return texts[-1]

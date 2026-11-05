@@ -254,8 +254,9 @@ def test_ai_says_not_covered_for_vague_message_still_asks(monkeypatch):
     agent.handle(s, "cant log in")
     assert s.is_open and "tell me a bit more" in s.messages[-1].text
     agent.handle(s, "help")
-    assert s.is_open  # second question
     agent.handle(s, "still")
+    assert s.is_open and not s.awaiting_offer  # third question
+    agent.handle(s, "hmm")
     assert s.awaiting_offer  # after two questions, a person is offered
 
 
@@ -325,3 +326,14 @@ def test_reply_with_an_invented_price_is_held_back():
     agent.handle(s, "How do I set up free shipping over $50?")
     assert s.awaiting_offer and "accurate information" in s.messages[-1].text
     assert "35" in s.note_for_agent
+
+
+def test_never_mind_starts_a_new_topic():
+    # Reut's test: "never mind . i cant log in" was treated as an answer to the products question.
+    agent, _ = make_agent()
+    s = new_session()
+    agent.handle(s, "which products you have")
+    agent.handle(s, "never mind . i cant log in")
+    assert "2. I'm locked out after resetting my password" in s.messages[-1].text
+    agent.handle(s, "2")
+    assert s.messages[-1].answered and "30 minutes" in s.messages[-1].text

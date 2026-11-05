@@ -40,9 +40,13 @@ def fake_chat_reply(text: str, latest: str, articles: list, ticket_text: str) ->
         return ChatReply(answered=False, cited_articles=[], reply="I will connect you with a specialist.",
                          missing="The fake AI found a topic the help center doesn't cover.")
     earlier = ticket_text.split("answer the merchant's latest message")[0]
-    asked_already = "tell me a bit more" in earlier or "reply with the number" in earlier
-    numbered = dict(re.findall(r"^(\d)\. (.+)$", text.split("Help-center articles")[0], re.M))
-    lines = [numbered.get(l.strip(), l) for l in merchant_lines(text)]  # "2" means the second choice
+    last_reply = earlier.rsplit("storely chat assistant:", 1)[-1] if "storely chat assistant:" in earlier else ""
+    asked_already = "tell me a bit more" in last_reply or "reply with the number" in last_reply
+    new_topic = re.match(r"^\W*(never ?mind|nvm|forget (it|that)|actually|anyway)\b\W*", latest)
+    if new_topic:  # "never mind, I can't log in" is a new question
+        asked_already, latest = False, latest[new_topic.end():]
+    numbered = dict(re.findall(r"^(\d)\. (.+)$", last_reply, re.M))
+    lines = [numbered.get(l.strip(), l) for l in merchant_lines(text)[-2:]]  # "2" means the second choice
     question = " ".join(lines) if asked_already else latest
     section, heading, overlap = match_section(text, question)
     if articles[0][1].startswith("What Storely offers") and not asked_already:
